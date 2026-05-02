@@ -1,0 +1,30 @@
+{
+	"compilerOptions": {
+		"paths": {
+			"@tokens/*": ["src/common/tokens/*"],
+			"@guards/*": ["src/core/guards/*"],
+			"@decorators/*": ["src/common/decorators/*"],
+			"@interfaces/*": ["src/common/interfaces/*"],
+			"@strategies/*": ["src/core/strategies/*"]
+		},
+		"module": "commonjs",
+		"declaration": true,
+		"removeComments": true,
+		"emitDecoratorMetadata": true,
+		"experimentalDecorators": true,
+		"allowSyntheticDefaultImports": true,
+		"target": "ES2021",
+		"sourceMap": true,
+		"outDir": "./dist",
+		"baseUrl": "./",
+		"incremental": true,
+		"skipLibCheck": true,
+		"strictNullChecks": true,
+		"forceConsistentCasingInFileNames": true,
+		"noImplicitAny": false,
+		"strictBindCallApply": false,
+		"noFallthroughCasesInSwitch": false,
+		"esModuleInterop": true,
+		"resolveJsonModule": true
+	}
+}

@@ -1,0 +1,1 @@
+export const GUARD_REGISTRY = 'GUARD_REGISTRY';

@@ -1,0 +1,1 @@
+export const DEFAULT_GUARD = 'DEFAULT_GUARD';
