@@ -1,0 +1,34 @@
+services:
+
+  lint:
+    build:
+      context: .
+      target: test
+    command: npm run lint
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  test:
+    build:
+      context: .
+      target: test
+    command: npm run test:cov
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - coverage:/app/coverage
+
+  build:
+    build:
+      context: .
+      target: build
+    command: npm run build
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - dist:/app/dist
+
+volumes:
+  coverage:
+  dist:

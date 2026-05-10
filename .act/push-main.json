@@ -1,0 +1,9 @@
+{
+  "ref": "refs/heads/main",
+  "repository": {
+    "full_name": "neoatalaya/auth-common",
+    "name": "auth-common",
+    "private": false
+  },
+  "pusher": { "name": "dev" }
+}
