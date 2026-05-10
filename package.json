@@ -1,6 +1,6 @@
 {
   "name": "@neoatalaya/auth-common",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Common authentication modules for NestJS microservices (guards, strategies, JWT validation)",
   "author": "NeoAtalaya",
   "license": "EPL-2.0",
@@ -22,11 +22,11 @@
   "scripts": {
     "build": "nest build",
     "pack": "npm pack",
-	"output": "node -e \"const f=require('fs').readdirSync('.').find(f=>f.endsWith('.tgz'));if(f)console.log(require('path').resolve(f));else process.exit(1);\"",
+    "output": "node -e \"const f=require('fs').readdirSync('.').find(f=>f.endsWith('.tgz'));if(f)console.log(require('path').resolve(f));else process.exit(1);\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-	"compile": "run-s test:cov build pack output",
+    "compile": "run-s test:cov build pack output",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\""
   },
@@ -72,14 +72,14 @@
       "json",
       "ts"
     ],
-	"coverageThreshold": {
-	  "global": {
-		"branches": 90,
-		"functions": 90,
-		"lines": 90,
-		"statements": 90
-	  }
-	},
+    "coverageThreshold": {
+      "global": {
+        "branches": 90,
+        "functions": 90,
+        "lines": 90,
+        "statements": 90
+      }
+    },
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
