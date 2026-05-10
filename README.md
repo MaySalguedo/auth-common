@@ -398,27 +398,79 @@ export class MyService {
 
 ### Development Scripts
 
+| Command | Description |
+|---------|-------------|
+| `npm run test` | Run unit tests once. |
+| `npm run test:watch` | Run tests in watch mode (auto‑rerun on changes). |
+| `npm run test:cov` | Run tests with coverage report (fails if coverage < 90%). |
+| `npm run build` | Compile TypeScript to `dist/` using NestJS builder. |
+| `npm run pack` | Create a `.tgz` archive of the package (dry‑run for publishing). |
+| `npm run output` | Print absolute path of the generated `.tgz` file (used after `pack`). |
+| `npm run compile` | **Full local build pipeline:** `test:cov` → `build` → `pack` → `output`. |
+| `npm run lint` | Run ESLint and auto‑fix issues. |
+| `npm run format` | Format code with Prettier. |
+
+#### 🐳 Docker (containerized tests)
+
+The repository includes a `Dockerfile` and `docker-compose.yml` to run the test suite inside a consistent Node.js environment.
+
 ```bash
-# Run unit tests
-npm run test
+# Build the test image
+docker compose build test
 
-# Run tests in watch mode
-npm run test:watch
+# Run unit tests inside the container
+docker compose run --rm test
 
-# Run tests with coverage report
-npm run test:cov
+# Run a specific test file (example)
+docker compose run --rm test npm run test -- src/common/tokens.spec.ts
+```
 
-# Build the library
-npm run build
+Coverage reports are written at `./coverage/lcov-report/index.html` directory file when using the provided compose setup.
 
-# Build and pack (generates .tgz for local testing)
+### 🏃‍♂️ Testing GitHub Actions locally with `act`
+
+You can simulate the exact CI/CD pipeline on your local machine using `act`. The repository already contains two event files under .act/:
+
+- `push-develop.json` – used to simulate a push to develop
+
+- `push-main.json` – used to simulate a push to main (including the publish job)
+
+Install `act`
+```bash
+# On windows
+choco install act-cli
+# or download from https://github.com/nektos/act/releases
+
+# List all available workflows
+act -l
+```
+
+To run the full CI workflow (lint, test, build) for a develop branch push:
+```bash
+act push -e .act/push-develop.json
+```
+
+The push-main.json event file triggers the publish job as well (it requires a valid npm token). The token is read from the .secrets file located at the repository root.
+
+Example .secrets file content:
+
+```env
+NPM_TOKEN=npm_your_actual_token_here
+```
+
+>💡 `act` uses Docker containers internally, so ensure Docker is installed and running. The provided event files match your GitHub Actions workflow (ci-cd.yml) exactly.
+
+### 🖥️ Local compilation & packaging
+The `compile` script is the recommended one‑shot build command:
+
+```bash
 npm run compile
+```
 
-# Lint and auto-fix
-npm run lint
+It enforces the 90% coverage threshold, builds the library, creates a `.tgz` archive, and prints its absolute path – perfect for CI or for local installation in another project:
 
-# Format source files
-npm run format
+```bash
+npm install /absolute/path/to/neoatalaya-auth-common-#.#.#.tgz
 ```
 
 <div align="center">
