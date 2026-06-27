@@ -54,8 +54,6 @@ jobs:
         with:
           name: dist
           path: dist/
-      - name: Set version from tag
-        run: jq ".version = \"${GITHUB_REF_NAME#v}\"" package.json > package.tmp.json && mv package.tmp.json package.json
       - name: Publish to npmjs
         run: pnpm publish --access public --provenance --no-git-checks
         env:
@@ -81,11 +79,12 @@ jobs:
           name: dist
           path: dist/
       - name: Set version from tag
+        if: github.event_name != 'workflow_dispatch'
         run: jq ".version = \"${GITHUB_REF_NAME#v}\"" package.json > package.tmp.json && mv package.tmp.json package.json
       - name: Publish to GitHub Packages
         run: |
           echo "@may-salguedo:registry=https://npm.pkg.github.com" > .npmrc
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.PACKAGES_GITHUB_TOKEN }}" >> .npmrc
           npm publish --access public
         env:
           NODE_OPTIONS: --no-deprecation
