@@ -98,6 +98,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - name: Create GitHub Release
         run: gh release create "${{ github.ref_name }}" --generate-notes --target "${{ github.sha }}"
         env:
