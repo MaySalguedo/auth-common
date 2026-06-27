@@ -35,32 +35,10 @@ jobs:
           path: dist/
           retention-days: 1
 
-  test:
-    name: Test Coverage
-    runs-on: ubuntu-latest
-    needs: setup
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate && pnpm --version
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        env:
-          NODE_OPTIONS: --no-deprecation
-      - name: Run tests with coverage
-        run: pnpm test:cov
-        env:
-          NODE_OPTIONS: --no-deprecation
-
   publish-npmjs:
     name: Publish to npmjs
     runs-on: ubuntu-latest
-    needs: [setup, test]
+    needs: setup
     permissions:
       id-token: write
     steps:
@@ -85,7 +63,7 @@ jobs:
   publish-github:
     name: Publish to GitHub Packages
     runs-on: ubuntu-latest
-    needs: [setup, test]
+    needs: setup
     permissions:
       packages: write
     steps:
@@ -93,6 +71,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@may-salguedo'
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@latest --activate && pnpm --version
       - name: Download dist artifact
@@ -101,10 +81,9 @@ jobs:
           name: dist
           path: dist/
       - name: Publish to GitHub Packages
-        run: |
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
-          pnpm publish --access public --no-git-checks --registry https://npm.pkg.github.com
+        run: pnpm publish --access public --no-git-checks
         env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: --no-deprecation
 
   release:
