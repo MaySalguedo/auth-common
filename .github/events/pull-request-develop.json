@@ -1,0 +1,19 @@
+{
+  "ref": "refs/pull/1/merge",
+  "pull_request": {
+    "number": 1,
+    "head": {
+      "ref": "feature-branch",
+      "sha": "abc123"
+    },
+    "base": {
+      "ref": "develop",
+      "sha": "def456"
+    }
+  },
+  "repository": {
+    "full_name": "MaySalguedo/auth-common",
+    "name": "auth-common",
+    "private": false
+  }
+}

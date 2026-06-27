@@ -1,0 +1,43 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate && pnpm --version
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          NODE_OPTIONS: --no-deprecation
+      - name: Build
+        run: pnpm build
+        env:
+          NODE_OPTIONS: --no-deprecation
+      - name: Publish to npm
+        run: pnpm publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_OPTIONS: --no-deprecation

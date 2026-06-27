@@ -1,10 +1,25 @@
 services:
 
-  lint:
+  audit:
     build:
       context: .
-      target: test
-    command: npm run lint
+      dockerfile: .github/docker/Dockerfile
+      target: audit
+
+  linter:
+    build:
+      context: .
+      dockerfile: .github/docker/Dockerfile
+      target: linter
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  check:
+    build:
+      context: .
+      dockerfile: .github/docker/Dockerfile
+      target: check
     volumes:
       - .:/app
       - /app/node_modules
@@ -12,8 +27,8 @@ services:
   test:
     build:
       context: .
+      dockerfile: .github/docker/Dockerfile
       target: test
-    command: npm run test:cov
     volumes:
       - .:/app
       - /app/node_modules
@@ -22,8 +37,8 @@ services:
   build:
     build:
       context: .
+      dockerfile: .github/docker/Dockerfile
       target: build
-    command: npm run build
     volumes:
       - .:/app
       - /app/node_modules

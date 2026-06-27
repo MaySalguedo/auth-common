@@ -1,6 +1,6 @@
 <div align="center">
 
-# @neoatalaya/auth-common
+# @may-salguedo/auth-common
 
 [![NestJS](https://img.shields.io/badge/NestJS-^10.0_||_^11.0-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)](https://nestjs.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-^5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -40,7 +40,7 @@ Plug-and-play JWT authentication infrastructure for **NestJS microservices**. On
 
 ## Overview
 
-`@neoatalaya/auth-common` solves a common problem in NestJS microservice architectures: every service needs JWT auth, but implementing guards, strategies, and per-route overrides from scratch in each service leads to drift and duplicated code.
+`@may-salguedo/auth-common` solves a common problem in NestJS microservice architectures: every service needs JWT auth, but implementing guards, strategies, and per-route overrides from scratch in each service leads to drift and duplicated code.
 
 This library provides a single `AuthCommonModule.forRoot()` call that:
 
@@ -65,7 +65,7 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 ## Installation
 
 ```bash
-npm install @neoatalaya/auth-common
+pnpm add @may-salguedo/auth-common
 ```
 
 ### Peer Dependencies
@@ -73,7 +73,7 @@ npm install @neoatalaya/auth-common
 Make sure the following packages are present in your project:
 
 ```bash
-npm install @nestjs/common @nestjs/core reflect-metadata rxjs
+pnpm add @nestjs/common @nestjs/core reflect-metadata rxjs
 ```
 
 ---
@@ -86,7 +86,7 @@ Import `AuthCommonModule` in your root `AppModule` using `forRoot()`:
 // app.module.ts
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { AuthCommonModule, OrchestratorGuard } from '@neoatalaya/auth-common';
+import { AuthCommonModule, OrchestratorGuard } from '@may-salguedo/auth-common';
 
 @Module({
   imports: [
@@ -95,7 +95,6 @@ import { AuthCommonModule, OrchestratorGuard } from '@neoatalaya/auth-common';
     }),
   ],
   providers: [
-    // Apply OrchestratorGuard globally — it handles public routes and per-route overrides automatically
     {
       provide: APP_GUARD,
       useClass: OrchestratorGuard,
@@ -176,10 +175,10 @@ You can also inject and use it directly:
 
 ```typescript
 import { UseGuards } from '@nestjs/common';
-import { JwtGuard } from '@neoatalaya/auth-common';
+import { JwtGuard } from '@may-salguedo/auth-common';
 
 @Controller('protected')
-@UseGuards(JwtGuard) // NestJS native UseGuards — bypasses the orchestrator
+@UseGuards(JwtGuard)
 export class ProtectedController {}
 ```
 
@@ -193,7 +192,7 @@ Marks a route or an entire controller as **publicly accessible**, bypassing the 
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';
-import { PublicGuard } from '@neoatalaya/auth-common';
+import { PublicGuard } from '@may-salguedo/auth-common';
 
 @Controller('auth')
 export class AuthController {
@@ -201,12 +200,10 @@ export class AuthController {
   @PublicGuard()
   @Get('login')
   login() {
-    // No JWT required
   }
 
   @Get('me')
   getProfile() {
-    // JWT required (falls back to defaultGuard)
   }
 }
 ```
@@ -223,13 +220,13 @@ export class PublicController {}
 
 ### `@UseGuards()`
 
-> ⚠️ This is **not** NestJS's built-in `@UseGuards()`. Import it from `@neoatalaya/auth-common` to work with the orchestrator.
+> ⚠️ This is **not** NestJS's built-in `@UseGuards()`. Import it from `@may-salguedo/auth-common` to work with the orchestrator.
 
 Specifies which named guard(s) the `OrchestratorGuard` should execute for a given route. Guards are executed **sequentially** — all must pass for the request to proceed.
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';
-import { UseGuards } from '@neoatalaya/auth-common';
+import { UseGuards } from '@may-salguedo/auth-common';
 
 @Controller('admin')
 export class AdminController {
@@ -237,13 +234,11 @@ export class AdminController {
   @UseGuards('jwt', 'roles')
   @Get('dashboard')
   getDashboard() {
-    // Both 'jwt' and 'roles' guards must pass
   }
 
   @UseGuards('api-key')
   @Get('webhook')
   handleWebhook() {
-    // Only the 'api-key' guard is executed
   }
 }
 ```
@@ -258,7 +253,7 @@ By default, `JwtStrategy` returns the decoded JWT payload as-is. Provide a `vali
 
 ```typescript
 // app.module.ts
-import { AuthCommonModule } from '@neoatalaya/auth-common';
+import { AuthCommonModule } from '@may-salguedo/auth-common';
 import { UnauthorizedException } from '@nestjs/common';
 
 interface MyPayload {
@@ -307,8 +302,8 @@ AuthCommonModule.forRoot({
   jwtSecret: process.env.JWT_SECRET,
   defaultGuard: 'jwt',
   guards: {
-    'api-key': ApiKeyGuard,          // pass class — module instantiates it
-    'custom':  new SomeGuardInstance(), // or pass an already-created instance
+    'api-key': ApiKeyGuard,
+    'custom':  new SomeGuardInstance(),
   },
 });
 ```
@@ -336,8 +331,8 @@ Standard JWT claims automatically merged into every decoded payload:
 
 ```typescript
 export interface TokenIssues {
-  iat: number; // Issued at (Unix timestamp)
-  exp: number; // Expiration (Unix timestamp)
+  iat: number;
+  exp: number;
 }
 ```
 
@@ -352,7 +347,7 @@ Your custom payload type is always intersected with `TokenIssues` when received 
 An `HttpException` that produces a **`424 Failed Dependency`** response. Useful inside `validate()` when the auth failure is caused by a downstream dependency (e.g. user service unavailable) rather than an invalid token.
 
 ```typescript
-import { FailedDependencyException } from '@neoatalaya/auth-common';
+import { FailedDependencyException } from '@may-salguedo/auth-common';
 
 validate: async (payload) => {
   const user = await userService.find(payload.sub).catch(() => {
@@ -384,7 +379,7 @@ The following DI injection tokens are exported for advanced scenarios where you 
 
 ```typescript
 import { Inject } from '@nestjs/common';
-import { GUARD_REGISTRY } from '@neoatalaya/auth-common';
+import { GUARD_REGISTRY } from '@may-salguedo/auth-common';
 
 @Injectable()
 export class MyService {
@@ -400,57 +395,75 @@ export class MyService {
 
 | Command | Description |
 |---------|-------------|
-| `npm run test` | Run unit tests once. |
-| `npm run test:watch` | Run tests in watch mode (auto‑rerun on changes). |
-| `npm run test:cov` | Run tests with coverage report (fails if coverage < 90%). |
-| `npm run build` | Compile TypeScript to `dist/` using NestJS builder. |
-| `npm run pack` | Create a `.tgz` archive of the package (dry‑run for publishing). |
-| `npm run output` | Print absolute path of the generated `.tgz` file (used after `pack`). |
-| `npm run compile` | **Full local build pipeline:** `test:cov` → `build` → `pack` → `output`. |
-| `npm run lint` | Run ESLint and auto‑fix issues. |
-| `npm run format` | Format code with Prettier. |
+| `pnpm test` | Run unit tests once. |
+| `pnpm test:watch` | Run tests in watch mode (auto-rerun on changes). |
+| `pnpm test:cov` | Run tests with coverage report (fails if coverage < 90%). |
+| `pnpm build` | Compile TypeScript to `dist/` using NestJS builder. |
+| `pnpm pack` | Create a `.tgz` archive of the package (dry-run for publishing). |
+| `pnpm output` | Print absolute path of the generated `.tgz` file (used after `pack`). |
+| `pnpm compile` | **Full local build pipeline:** `build` `pack` `output`. |
+| `pnpm lint` | Run ESLint and auto-fix issues. |
+| `pnpm lint:no-spec` | Run ESLint excluding spec files. |
+| `pnpm format` | Format code with Prettier. |
+| `pnpm check` | TypeScript type-check without emitting files. |
+| `pnpm audit` | Check for high/critical vulnerabilities. |
 
-#### 🐳 Docker (containerized tests)
+#### Docker (containerized tests)
 
-The repository includes a `Dockerfile` and `docker-compose.yml` to run the test suite inside a consistent Node.js environment.
+The repository includes a multi-stage `Dockerfile` under `.github/docker/` and a `docker-compose.yml` at the root to run every job inside a consistent Node.js environment.
 
 ```bash
-# Build the test image
 docker compose build test
-
-# Run unit tests inside the container
 docker compose run --rm test
-
-# Run a specific test file (example)
-docker compose run --rm test npm run test -- src/common/tokens.spec.ts
+docker compose run --rm test pnpm test -- src/common/tokens.spec.ts
 ```
 
-Coverage reports are written at `./coverage/lcov-report/index.html` directory file when using the provided compose setup.
+The same compose file supports all CI jobs:
 
-### 🏃‍♂️ Testing GitHub Actions locally with `act`
+```bash
+docker compose build audit
+docker compose run --rm audit
 
-You can simulate the exact CI/CD pipeline on your local machine using `act`. The repository already contains two event files under .act/:
+docker compose build linter
+docker compose run --rm linter
 
-- `push-develop.json` – used to simulate a push to develop
+docker compose build check
+docker compose run --rm check
 
-- `push-main.json` – used to simulate a push to main (including the publish job)
+docker compose build build
+docker compose run --rm build
+```
+
+Coverage reports are written at `./coverage/lcov-report/index.html` when using the provided compose setup.
+
+### Testing GitHub Actions locally with `act`
+
+You can simulate the exact CI/CD pipeline on your local machine using `act`. The repository already contains event files under .github/events/:
+
+- `push-develop.json` -- used to simulate a push to develop
+- `push-main.json` -- used to simulate a push to main (including the publish job)
+- `pull-request-develop.json` -- used to simulate a PR against develop
+- `pull-request-main.json` -- used to simulate a PR against main
 
 Install `act`
-```bash
-# On windows
-choco install act-cli
-# or download from https://github.com/nektos/act/releases
 
-# List all available workflows
+```bash
 act -l
 ```
 
-To run the full CI workflow (lint, test, build) for a develop branch push:
+To run the CI workflow for a develop branch push:
+
 ```bash
-act push -e .act/push-develop.json
+act push -e .github/events/push-develop.json
 ```
 
-The push-main.json event file triggers the publish job as well (it requires a valid npm token). The token is read from the .secrets file located at the repository root.
+For a PR event:
+
+```bash
+act pull_request -e .github/events/pull-request-develop.json
+```
+
+The `push-main.json` event file triggers the publish job as well (it requires a valid npm token). The token is read from the `.secrets` file located at the repository root.
 
 Example .secrets file content:
 
@@ -458,34 +471,36 @@ Example .secrets file content:
 NPM_TOKEN=npm_your_actual_token_here
 ```
 
->💡 `act` uses Docker containers internally, so ensure Docker is installed and running. The provided event files match your GitHub Actions workflow (ci-cd.yml) exactly.
+> `act` uses Docker containers internally, so ensure Docker is installed and running. The provided event files match your GitHub Actions workflows (ci.yml, cd.yml) exactly.
 
-### 🖥️ Local compilation & packaging
-The `compile` script is the recommended one‑shot build command:
+### Local compilation & packaging
+
+The `compile` script is the recommended one-shot build command:
 
 ```bash
-npm run compile
+pnpm compile
 ```
 
-It enforces the 90% coverage threshold, builds the library, creates a `.tgz` archive, and prints its absolute path – perfect for CI or for local installation in another project:
+Creates a `.tgz` archive and prints its absolute path -- perfect for CI or for local installation in another project:
 
 ```bash
-npm install /absolute/path/to/neoatalaya-auth-common-#.#.#.tgz
+pnpm install /absolute/path/to/may-salguedo-auth-common-#.#.#.tgz
 ```
 
 <div align="center">
 
 ---
-## 📄 License
 
-This project is licensed under the **Eclipse Public License 2.0 (EPL-2.0)**.  
-You may obtain a copy of the License at  
+## License
 
-[https://www.eclipse.org/legal/epl-2.0/](https://www.eclipse.org/legal/epl-2.0/)  
+This project is licensed under the **Eclipse Public License 2.0 (EPL-2.0)**.
+You may obtain a copy of the License at
+
+[https://www.eclipse.org/legal/epl-2.0/](https://www.eclipse.org/legal/epl-2.0/)
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
 ---
 
-  Made with ❤️ by <strong>NeoAtalaya</strong>
+  Made with ❤️ by <strong>MaySalguedo</strong>
 </div>
