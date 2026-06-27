@@ -54,6 +54,8 @@ jobs:
         with:
           name: dist
           path: dist/
+      - name: Set version from tag
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
       - name: Publish to npmjs
         run: pnpm publish --access public --provenance --no-git-checks
         env:
@@ -71,8 +73,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: https://npm.pkg.github.com
-          scope: '@may-salguedo'
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@latest --activate && pnpm --version
       - name: Download dist artifact
@@ -80,10 +80,14 @@ jobs:
         with:
           name: dist
           path: dist/
+      - name: Set version from tag
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
       - name: Publish to GitHub Packages
-        run: pnpm publish --access public --no-git-checks
+        run: |
+          echo "@may-salguedo:registry=https://npm.pkg.github.com" > .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
+          npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: --no-deprecation
 
   release:
