@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
+    branches: [develop, main]
   pull_request:
+    branches: [develop, main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -76,7 +78,6 @@ jobs:
     if: >
       github.ref_name == 'main' ||
       github.ref_name == 'develop' ||
-      startsWith(github.ref_name, 'v') ||
       github.base_ref == 'main' ||
       github.base_ref == 'develop'
     steps:
