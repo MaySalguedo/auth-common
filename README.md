@@ -406,7 +406,8 @@ export class MyService {
 | `pnpm lint:no-spec` | Run ESLint excluding spec files. |
 | `pnpm format` | Format code with Prettier. |
 | `pnpm check` | TypeScript type-check without emitting files. |
-| `pnpm audit` | Check for high/critical vulnerabilities. |
+| `pnpm audit` | Check for vulnerabilities (fails on any severity). |
+| `pnpm audit:trivy` | Run Trivy filesystem scan (vulns, misconfigs, licenses). |
 
 #### Docker (containerized tests)
 
@@ -438,40 +439,65 @@ Coverage reports are written at `./coverage/lcov-report/index.html` when using t
 
 ### Testing GitHub Actions locally with `act`
 
-You can simulate the exact CI/CD pipeline on your local machine using `act`. The repository already contains event files under .github/events/:
+You can simulate the CI/CD pipeline on your local machine using `act`. The repository includes event files under `.github/events/`:
 
-- `push-develop.json` -- used to simulate a push to develop
-- `push-main.json` -- used to simulate a push to main (including the publish job)
-- `pull-request-develop.json` -- used to simulate a PR against develop
-- `pull-request-main.json` -- used to simulate a PR against main
+| Event file | Triggers | Workflow |
+|---|---|---|
+| `push-develop.json` | Push to `develop` | CI |
+| `push-main.json` | Push to `main` | CI |
+| `push-tag.json` | Push tag `v*` | CD |
+| `pull-request-develop.json` | PR against `develop` | CI |
+| `pull-request-main.json` | PR against `main` | CI |
+| `workflow-dispatch.json` | Manual dispatch | CI / CD |
 
-Install `act`
+Install `act` and list available jobs:
 
 ```bash
 act -l
 ```
 
-To run the CI workflow for a develop branch push:
+#### Testing CI
 
 ```bash
-act push -e .github/events/push-develop.json
+# Push to develop
+act -W .github/workflows/ci.yml -e .github/events/push-develop.json
+
+# PR against develop
+act -W .github/workflows/ci.yml -e .github/events/pull-request-develop.json
 ```
 
-For a PR event:
+#### Testing CD (up to Trivy scan)
 
 ```bash
-act pull_request -e .github/events/pull-request-develop.json
+act -W .github/workflows/cd.yml -e .github/events/push-tag.json \
+  -j trivy-scan --artifact-server-path /tmp/act-artifacts \
+  --secret-file .secrets
 ```
 
-The `push-main.json` event file triggers the publish job as well (it requires a valid npm token). The token is read from the `.secrets` file located at the repository root.
+The `--artifact-server-path` flag is required for the artifact upload/download actions to work locally. Using `-j trivy-scan` runs the full dependency chain (`wait-for-ci` → `setup` → `trivy-scan`).
 
-Example .secrets file content:
+> The `wait-for-ci` job is automatically skipped when running in `act` (it detects the `ACT=true` environment variable) since there is no real CI workflow run to check. On GitHub, it polls the CI workflow for the same commit and blocks CD until CI succeeds.
+
+#### Testing CD (full pipeline)
+
+To test the publish and release jobs locally, add the required tokens to `.secrets`:
 
 ```env
-NPM_TOKEN=npm_your_actual_token_here
+GITHUB_TOKEN=ghp_your_github_token_here
+NPM_TOKEN=npm_your_npm_token_here
 ```
 
-> `act` uses Docker containers internally, so ensure Docker is installed and running. The provided event files match your GitHub Actions workflows (ci.yml, cd.yml) exactly.
+Then run:
+
+```bash
+act -W .github/workflows/cd.yml -e .github/events/push-tag.json \
+  --artifact-server-path /tmp/act-artifacts \
+  --secret-file .secrets
+```
+
+> The `GITHUB_TOKEN` requires `public_repo` scope for `act` to clone action repos and populate `github.token`. For the full CD pipeline locally, the PAT also needs `write:packages` (GitHub Packages) — `contents: write` is included in `public_repo` for public repos, and `permissions` set in each CD job apply only on GitHub.
+
+> `act` uses Docker containers internally, so ensure Docker is installed and running. The provided event files match your GitHub Actions workflows (`ci.yml`, `cd.yml`) exactly.
 
 ### Local compilation & packaging
 

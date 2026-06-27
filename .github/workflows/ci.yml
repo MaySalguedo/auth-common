@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 24
       - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate && pnpm --version
+        run: bash scripts/enable-pnpm.sh
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: 24
       - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate && pnpm --version
+        run: bash scripts/enable-pnpm.sh
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
@@ -61,7 +61,7 @@ jobs:
         with:
           node-version: 24
       - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate && pnpm --version
+        run: bash scripts/enable-pnpm.sh
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
@@ -90,16 +90,7 @@ jobs:
         run: docker compose run --rm test
       - name: Extract coverage report from container
         if: always()
-        run: |
-          docker compose run --rm --entrypoint "" test \
-            sh -c "cp -r /app/coverage /tmp/coverage-out" || true
-          docker cp \
-            "$(docker compose ps -q test 2>/dev/null | head -1)":/tmp/coverage-out ./coverage \
-            2>/dev/null || \
-          docker run --rm \
-            -v "$(basename $(pwd))_coverage:/data" \
-            -v "$PWD:/host" \
-            alpine sh -c "cp -r /data /host/coverage" 2>/dev/null || true
+        run: bash scripts/extract-coverage.sh
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         if: always()

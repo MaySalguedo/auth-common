@@ -1,0 +1,15 @@
+severity:
+  - UNKNOWN
+  - LOW
+  - MEDIUM
+  - HIGH
+  - CRITICAL
+exit-code: 1
+format: table
+scan:
+  scanners:
+    - vuln
+    - misconfig
+    - license
+  skip-dirs:
+    - node_modules

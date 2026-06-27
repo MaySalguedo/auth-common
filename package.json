@@ -1,6 +1,6 @@
 {
   "name": "@may-salguedo/auth-common",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Common authentication modules for NestJS microservices (guards, strategies, JWT validation)",
   "license": "EPL-2.0",
   "packageManager": "pnpm@10.8.1",
@@ -34,6 +34,7 @@
     "lint:no-spec": "eslint \"src/**/*.ts\" --fix --ignore-pattern \"*.spec.ts\"",
     "format": "prettier --write \"src/**/*.ts\"",
     "audit": "pnpm audit --audit-level=low",
+    "audit:trivy": "trivy fs --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --scanners vuln,misconfig,license --skip-dirs node_modules .",
     "check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

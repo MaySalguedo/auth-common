@@ -8,9 +8,23 @@ on:
 
 jobs:
 
+  wait-for-ci:
+    name: Wait for CI
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch'
+    permissions:
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check CI status for commit
+        run: bash scripts/wait-for-ci.sh "${{ github.sha }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   setup:
     name: Setup & Build
     runs-on: ubuntu-latest
+    needs: wait-for-ci
     permissions:
       contents: read
     steps:
@@ -19,7 +33,7 @@ jobs:
         with:
           node-version: 24
       - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate && pnpm --version
+        run: bash scripts/enable-pnpm.sh
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
@@ -35,10 +49,30 @@ jobs:
           path: dist/
           retention-days: 1
 
+  trivy-scan:
+    name: Trivy Vulnerability Scan
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          trivy-config: trivy.yaml
+
   publish-npmjs:
     name: Publish to npmjs
     runs-on: ubuntu-latest
-    needs: setup
+    needs: [setup, trivy-scan]
     permissions:
       id-token: write
     steps:
@@ -48,7 +82,7 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
       - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate && pnpm --version
+        run: bash scripts/enable-pnpm.sh
       - name: Download dist artifact
         uses: actions/download-artifact@v4
         with:
@@ -63,7 +97,7 @@ jobs:
   publish-github:
     name: Publish to GitHub Packages
     runs-on: ubuntu-latest
-    needs: setup
+    needs: [setup, trivy-scan]
     permissions:
       packages: write
     steps:
@@ -72,7 +106,7 @@ jobs:
         with:
           node-version: 24
       - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate && pnpm --version
+        run: bash scripts/enable-pnpm.sh
       - name: Download dist artifact
         uses: actions/download-artifact@v4
         with:
@@ -80,14 +114,11 @@ jobs:
           path: dist/
       - name: Set version from tag
         if: github.event_name != 'workflow_dispatch'
-        run: jq ".version = \"${GITHUB_REF_NAME#v}\"" package.json > package.tmp.json && mv package.tmp.json package.json
+        run: bash scripts/set-version-from-tag.sh
       - name: Publish to GitHub Packages
-        run: |
-          jq '.name = "@MaySalguedo/auth-common"' package.json > package.tmp.json && mv package.tmp.json package.json
-          echo "@MaySalguedo:registry=https://npm.pkg.github.com" > .npmrc
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.PACKAGES_GITHUB_TOKEN }}" >> .npmrc
-          npm publish --access public
+        run: bash scripts/publish-github-packages.sh
         env:
+          PACKAGES_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: --no-deprecation
 
   release:
