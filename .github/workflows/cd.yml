@@ -83,7 +83,8 @@ jobs:
         run: jq ".version = \"${GITHUB_REF_NAME#v}\"" package.json > package.tmp.json && mv package.tmp.json package.json
       - name: Publish to GitHub Packages
         run: |
-          echo "@may-salguedo:registry=https://npm.pkg.github.com/MaySalguedo" > .npmrc
+          jq '.name = "@MaySalguedo/auth-common"' package.json > package.tmp.json && mv package.tmp.json package.json
+          echo "@MaySalguedo:registry=https://npm.pkg.github.com" > .npmrc
           echo "//npm.pkg.github.com/:_authToken=${{ secrets.PACKAGES_GITHUB_TOKEN }}" >> .npmrc
           npm publish --access public
         env:
