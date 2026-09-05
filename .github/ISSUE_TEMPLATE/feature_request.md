@@ -1,18 +1,10 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
-title: ''
-labels: ''
-assignees: ''
-
----
-
----
-name: New Feature (Pitch)
 about: Suggest a new library feature, API addition, or internal enhancement.
 title: '[PITCH] - '
 labels: 'enhancement'
 assignees: ''
+
 ---
 
 ## 1. The Problem (Need & Context)

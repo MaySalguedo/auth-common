@@ -1,2 +1,9 @@
+allowBuilds:
+  unrs-resolver: true
 overrides:
-  "js-yaml": "4.2.0"
+  js-yaml: "4.3.2"
+  fast-uri: "3.1.6"
+  browserslist: "4.28.8"
+  "brace-expansion@1": "1.1.18"
+  "brace-expansion@2": "2.1.4"
+  "brace-expansion@5": "5.0.9"
