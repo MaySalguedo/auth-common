@@ -1,6 +1,6 @@
 <div align="center">
 
-# @MaySalguedo/auth-common
+# @may-salguedo/auth-common
 
 [![NestJS](https://img.shields.io/badge/NestJS-^10.0_||_^11.0-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)](https://nestjs.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-^5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -41,7 +41,7 @@ Plug-and-play JWT authentication infrastructure for **NestJS microservices**. On
 
 ## Overview
 
-`@MaySalguedo/auth-common` solves a common problem in NestJS microservice architectures: every service needs JWT auth, but implementing guards, strategies, and per-route overrides from scratch in each service leads to drift and duplicated code.
+`@may-salguedo/auth-common` solves a common problem in NestJS microservice architectures: every service needs JWT auth, but implementing guards, strategies, and per-route overrides from scratch in each service leads to drift and duplicated code.
 
 This library provides a single `AuthCommonModule.forRoot()` call that:
 
@@ -67,7 +67,7 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 ## Installation
 
 ```bash
-pnpm add @MaySalguedo/auth-common
+pnpm add @may-salguedo/auth-common
 ```
 
 ### Peer Dependencies
@@ -88,7 +88,7 @@ Import `AuthCommonModule` in your root `AppModule` using `forRoot()`:
 // app.module.ts
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { AuthCommonModule, OrchestratorGuard } from '@MaySalguedo/auth-common';
+import { AuthCommonModule, OrchestratorGuard } from '@may-salguedo/auth-common';
 
 @Module({
   imports: [
@@ -177,7 +177,7 @@ You can also inject and use it directly:
 
 ```typescript
 import { UseGuards } from '@nestjs/common';
-import { JwtGuard } from '@MaySalguedo/auth-common';
+import { JwtGuard } from '@may-salguedo/auth-common';
 
 @Controller('protected')
 @UseGuards(JwtGuard)
@@ -194,7 +194,7 @@ Marks a route or an entire controller as **publicly accessible**, bypassing the 
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';
-import { PublicGuard } from '@MaySalguedo/auth-common';
+import { PublicGuard } from '@may-salguedo/auth-common';
 
 @Controller('auth')
 export class AuthController {
@@ -222,13 +222,13 @@ export class PublicController {}
 
 ### `@UseGuards()`
 
-> ⚠️ This is **not** NestJS's built-in `@UseGuards()`. Import it from `@MaySalguedo/auth-common` to work with the orchestrator.
+> ⚠️ This is **not** NestJS's built-in `@UseGuards()`. Import it from `@may-salguedo/auth-common` to work with the orchestrator.
 
 Specifies which named guard(s) the `OrchestratorGuard` should execute for a given route. Guards are executed **sequentially** — all must pass for the request to proceed.
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';
-import { UseGuards } from '@MaySalguedo/auth-common';
+import { UseGuards } from '@may-salguedo/auth-common';
 
 @Controller('admin')
 export class AdminController {
@@ -255,7 +255,7 @@ Declaratively require that the verified JWT payload (`request.user` from `JwtStr
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';
-import { RequireAttribute } from '@MaySalguedo/auth-common';
+import { RequireAttribute } from '@may-salguedo/auth-common';
 
 @Controller('reports')
 export class ReportsController {
@@ -329,7 +329,7 @@ By default, `JwtStrategy` returns the decoded JWT payload as-is. Provide a `vali
 
 ```typescript
 // app.module.ts
-import { AuthCommonModule } from '@MaySalguedo/auth-common';
+import { AuthCommonModule } from '@may-salguedo/auth-common';
 import { UnauthorizedException } from '@nestjs/common';
 
 interface MyPayload {
@@ -423,7 +423,7 @@ Your custom payload type is always intersected with `TokenIssues` when received 
 An `HttpException` that produces a **`424 Failed Dependency`** response. Useful inside `validate()` when the auth failure is caused by a downstream dependency (e.g. user service unavailable) rather than an invalid token.
 
 ```typescript
-import { FailedDependencyException } from '@MaySalguedo/auth-common';
+import { FailedDependencyException } from '@may-salguedo/auth-common';
 
 validate: async (payload) => {
   const user = await userService.find(payload.sub).catch(() => {
@@ -456,7 +456,7 @@ The following DI injection tokens are exported for advanced scenarios where you 
 
 ```typescript
 import { Inject } from '@nestjs/common';
-import { GUARD_REGISTRY } from '@MaySalguedo/auth-common';
+import { GUARD_REGISTRY } from '@may-salguedo/auth-common';
 
 @Injectable()
 export class MyService {
@@ -587,7 +587,7 @@ pnpm compile
 Creates a `.tgz` archive and prints its absolute path -- perfect for CI or for local installation in another project:
 
 ```bash
-pnpm install /absolute/path/to/MaySalguedo-auth-common-#.#.#.tgz
+pnpm install /absolute/path/to/may-salguedo-auth-common-#.#.#.tgz
 ```
 
 <div align="center">

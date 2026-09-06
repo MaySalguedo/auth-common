@@ -1,16 +1,16 @@
-# Release Notes — v1.0.8
+# Release Notes — v1.0.9
 
-> **Target:** `develop` → `main` | **Date:** 2026-09-06 | **Scope:** `@MaySalguedo/auth-common` | **Compare:** `main...develop`
+> **Target:** `develop` → `main` | **Date:** 2026-09-06 | **Scope:** `@may-salguedo/auth-common` (npmjs) / `@MaySalguedo/auth-common` (GH Packages) | **Compare:** `main...develop`
 
-This release consolidates the library rename, CI/CD modernization, and the new declarative JWT attribute validation feature into a single curated release.
+This release consolidates CI/CD modernization, GH Packages scope handling, and the new declarative JWT attribute validation feature into a single curated release.
 
 ---
 
 ## Highlights
 
 - **New Feature:** `@RequireAttribute()` — declarative per-route JWT payload validation (nested + array-aware) enforced in `JwtGuard` — `feat(auth): RequireAttribute` (#2)
-- **Breaking Chore:** Package scope unified to `@MaySalguedo/auth-common` (`package.json:2`) — correct GitHub Packages case-sensitive publishing — `chore(release): align package scope` (#4)
-- **CI/CD:** CI now runs on every branch (`ci.yml:3-6` `branches: ['**']`), release is file-driven via `RELEASE_NOTES.md` (`cd.yml:134` `--notes-file`), obsolete `jq` rewrite removed (`scripts/publish-github-packages.sh:2`)
+- **Chore:** Package scope handling restored — `package.json:2` stays `@may-salguedo/auth-common` for npmjs (`may-salguedo` account), GH Packages publishes as `@MaySalguedo/auth-common` via `scripts/publish-github-packages.sh:2` `jq` rewrite for case-sensitive `PUT` — `chore(release): restore scope` (#4)
+- **CI/CD:** CI now runs on every branch (`ci.yml:3-6` `branches: ['**']`), release is file-driven via `RELEASE_NOTES.md` (`cd.yml:134` `--notes-file`), `jq` rewrite kept for GH Packages
 - **DX:** New PR and Issue templates (`PULL_REQUEST_TEMPLATE/`, `ISSUE_TEMPLATE/chore_request.md`), `README.md` showcases `RequireAttribute` with tables and error format
 
 ---
@@ -35,7 +35,7 @@ This release consolidates the library rename, CI/CD modernization, and the new d
 
 **Usage:**
 ```typescript
-import { RequireAttribute } from '@MaySalguedo/auth-common';
+import { RequireAttribute } from '@may-salguedo/auth-common';
 
 @RequireAttribute('role', 'admin') // scalar
 @RequireAttribute('organization.plan', 'pro') // nested
@@ -54,20 +54,20 @@ import { RequireAttribute } from '@MaySalguedo/auth-common';
 
 **Merged:** `b9f978a` → `fcb09c5` → `Merge #2` `413f66a`
 
-### 2. Chore — `chore(release): align package scope and streamline CI/CD` (#4)
+### 2. Chore — `chore(release): restore package scope and streamline CI/CD` (#4)
 
-**Motivation:** `ci.yml` only `main`/`develop` delayed feedback; `package.json:2` lowercase hyphen vs GH Packages case-sensitive `MaySalguedo` required runtime `jq` rewrite; `--generate-notes` did not allow curated `RELEASE_NOTES.md`; docs drifted.
+**Motivation:** `ci.yml` only `main`/`develop` delayed feedback; GH Packages case-sensitive `MaySalguedo` requires `jq` rewrite while npmjs stays `@may-salguedo`; `--generate-notes` did not allow curated `RELEASE_NOTES.md`; docs drifted.
 
 **Implementation:**
 - `ci.yml:3-6` — `on: push: branches: ['**']` + `pull_request:` (no base filter), keep `concurrency: cancel-in-progress`, `test-coverage` stays gated `ci.yml:77-81` (`main`/`develop` only) to limit Docker cost
-- `package.json:2` — `"name": "@MaySalguedo/auth-common"` (unified source of truth)
-- `scripts/publish-github-packages.sh:2` — removed `jq '.name = "@MaySalguedo/auth-common"'` (registry-only: `@MaySalguedo:registry=https://npm.pkg.github.com` + auth token, `npm publish --access public`)
+- `package.json:2` — `"name": "@may-salguedo/auth-common"` stays for npmjs account `may-salguedo` (scope `may-salguedo`)
+- `scripts/publish-github-packages.sh:2` — keep `jq '.name = "@MaySalguedo/auth-common"'` rewrite for GH Packages `https://npm.pkg.github.com` (`@MaySalguedo:registry` + auth token, `npm publish --access public`)
 - `cd.yml:134` — `gh release create "${{ github.ref_name }}" --notes-file RELEASE_NOTES.md --target "${{ github.sha }}"` (file-driven, you write `RELEASE_NOTES.md` before tag)
-- `README.md:3,68,89,178,195,223,229,256,350,382,513` — all installs/imports `@MaySalguedo/auth-common`, `pnpm install /.../MaySalguedo-auth-common-*.tgz`
+- `README.md:3,68,89,178,195,223,229,256,350,382,513` — all installs/imports `@may-salguedo/auth-common`, `pnpm install /.../may-salguedo-auth-common-*.tgz`
 - `pnpm-lock.yaml` refresh (557 lines) from `pnpm install`
-- `pnpm pack` now `MaySalguedo-auth-common-*.tgz`
+- `pnpm pack` now `may-salguedo-auth-common-*.tgz`
 
-**Verified:** `pnpm build` → `MaySalguedo-auth-common-1.0.7.tgz`, `pnpm lint:no-spec`/`pnpm check` green, `act` CI simulation passes.
+**Verified:** `pnpm build` → `may-salguedo-auth-common-1.0.7.tgz`, `pnpm lint:no-spec`/`pnpm check` green, `act` CI simulation passes.
 
 **Merged:** `07dc022` → `Merge #4` `fcebf1a`
 
@@ -82,32 +82,27 @@ import { RequireAttribute } from '@MaySalguedo/auth-common';
 
 ## Breaking Changes
 
-- **Package rename:** `@may-salguedo/auth-common` → `@MaySalguedo/auth-common` (scope case + hyphen removal). **Impact:** Consumers must `pnpm remove @may-salguedo/auth-common && pnpm add @MaySalguedo/auth-common` and update all `from '@may-salguedo/auth-common'` → `from '@MaySalguedo/auth-common'`. `npm` lowercases display to `@maysalguedo` but GH Packages preserves `MaySalguedo` case — `NPM_TOKEN` must have `publish` on `@MaySalguedo`.
+- **Package scope:** No breaking rename — `@may-salguedo/auth-common` stays for npmjs account `may-salguedo` (scope `may-salguedo`). GH Packages publishes as `@MaySalguedo/auth-common` via `jq` rewrite — consumers keep `pnpm add @may-salguedo/auth-common` / `from '@may-salguedo/auth-common'`.
 - **Release process:** `RELEASE_NOTES.md` must be committed before `git tag v*` — `cd.yml:134` will fail if missing (intentional, curated notes).
 
 ## Migration Guide
 
 ```bash
-# 1. Update dependency
-pnpm remove @may-salguedo/auth-common
-pnpm add @MaySalguedo/auth-common
+# No package migration — scope stays @may-salguedo/auth-common for npmjs account may-salguedo
 
-# 2. Replace imports (project-wide)
-# find src -type f -name "*.ts" | xargs sed -i "s/@may-salguedo\/auth-common/@MaySalguedo\/auth-common/g"
-
-# 3. Optional: Adopt RequireAttribute (replace manual if checks)
-import { RequireAttribute } from '@MaySalguedo/auth-common';
+# Optional: Adopt RequireAttribute (replace manual if checks)
+import { RequireAttribute } from '@may-salguedo/auth-common';
 @RequireAttribute('roles','admin')
 @Get('admin') getAdmin() {}
 
-# 4. Release: write RELEASE_NOTES.md, then tag
-git tag v1.0.8 && git push origin v1.0.8 # triggers CD: wait-for-ci → setup → trivy-scan → publish-npmjs + publish-github → release --notes-file
+# Release: write RELEASE_NOTES.md, then tag
+git tag v1.0.9 && git push origin v1.0.9 # triggers CD: wait-for-ci → setup → trivy-scan → publish-npmjs + publish-github → release --notes-file
 ```
 
 ## What's Changed — Commits & PRs
 
 - `feat(auth): RequireAttribute` (#2) — `b9f978a`, `c73cab6`, `fcb09c5`, merge `413f66a` — `Related to #1`
-- `chore(release): align package scope` (#4) — `07dc022`, `d8d8818`, merge `fcebf1a` — `Closes chore issue #3`
+- `chore(release): restore package scope` (#4) — `07dc022`, `d8d8818`, merge `fcebf1a` — `Closes chore issue #3`
 - `feat(templates): PULL_REQUEST_TEMPLATE` — `c73cab6`
 - `feat(template): chore issue template` — `d8d8818`
 
@@ -123,5 +118,5 @@ Full diff: `main...develop` — 26 files, +1375/-400, 1246 new test lines.
 ## Checklist for Release
 
 - [x] `RELEASE_NOTES.md` committed (this file)
-- [ ] `git tag v1.0.8 && git push origin v1.0.8` triggers `cd.yml`
-- [ ] Verify `npm view @MaySalguedo/auth-common version` and `GH Packages` + `gh release view v1.0.8 --json body` matches this file
+- [ ] `git tag v1.0.9 && git push origin v1.0.9` triggers `cd.yml`
+- [ ] Verify `npm view @may-salguedo/auth-common version` and `GH Packages @MaySalguedo/auth-common` + `gh release view v1.0.9 --json body` matches this file
