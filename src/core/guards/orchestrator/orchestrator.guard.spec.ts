@@ -115,6 +115,33 @@ describe('OrchestratorGuard', () => {
       const guard = module.get(OrchestratorGuard);
       expect(await guard.canActivate(ctx)).toBe(true);
     });
+
+    it('should fallback to default guard when USE_GUARDS_KEY is empty array', async () => {
+      const jwtGuard = makeGuard(true);
+      const module = await buildModule({
+        reflector: makeReflector({
+          [IS_PUBLIC_KEY]: false,
+          [USE_GUARDS_KEY]: [],
+        }),
+        registry: { jwt: jwtGuard },
+        defaultGuard: 'jwt',
+      });
+      const guard = module.get(OrchestratorGuard);
+      expect(await guard.canActivate(ctx)).toBe(true);
+      expect(jwtGuard.canActivate).toHaveBeenCalledWith(ctx);
+    });
+
+    it('should return true when USE_GUARDS_KEY is empty and no default', async () => {
+      const module = await buildModule({
+        reflector: makeReflector({
+          [IS_PUBLIC_KEY]: false,
+          [USE_GUARDS_KEY]: [],
+        }),
+        registry: {},
+      });
+      const guard = module.get(OrchestratorGuard);
+      expect(await guard.canActivate(ctx)).toBe(true);
+    });
   });
 
   // ── Claves explícitas con @UseGuards ───────────────────────────────

@@ -1,6 +1,6 @@
 <div align="center">
 
-# @may-salguedo/auth-common
+# @MaySalguedo/auth-common
 
 [![NestJS](https://img.shields.io/badge/NestJS-^10.0_||_^11.0-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)](https://nestjs.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-^5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -28,6 +28,7 @@ Plug-and-play JWT authentication infrastructure for **NestJS microservices**. On
 - [Decorators](#decorators)
   - [`@PublicGuard()`](#publicguard)
   - [`@UseGuards()`](#useguards)
+  - [`@RequireAttribute()`](#requireattribute)
 - [Custom Payload Validation](#custom-payload-validation)
 - [Custom Guards](#custom-guards)
 - [Interfaces & Types](#interfaces--types)
@@ -40,7 +41,7 @@ Plug-and-play JWT authentication infrastructure for **NestJS microservices**. On
 
 ## Overview
 
-`@may-salguedo/auth-common` solves a common problem in NestJS microservice architectures: every service needs JWT auth, but implementing guards, strategies, and per-route overrides from scratch in each service leads to drift and duplicated code.
+`@MaySalguedo/auth-common` solves a common problem in NestJS microservice architectures: every service needs JWT auth, but implementing guards, strategies, and per-route overrides from scratch in each service leads to drift and duplicated code.
 
 This library provides a single `AuthCommonModule.forRoot()` call that:
 
@@ -58,6 +59,7 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 - 🌐 **Public route bypass** — mark any endpoint with `@PublicGuard()` to skip auth entirely.
 - 🔌 **Extensible** — register any number of custom guards (`api-key`, `roles`, `subscription`) alongside JWT.
 - 🧩 **Custom payload validation** — inject your own `validate()` function to enrich or reject the decoded token payload.
+- ✅ **Attribute validation** — declaratively require JWT payload attributes (nested + array-aware) via `@RequireAttribute()` enforced in `JwtGuard`.
 - 📦 **Minimal peer dependencies** — only requires the standard NestJS core packages.
 
 ---
@@ -65,7 +67,7 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 ## Installation
 
 ```bash
-pnpm add @may-salguedo/auth-common
+pnpm add @MaySalguedo/auth-common
 ```
 
 ### Peer Dependencies
@@ -86,7 +88,7 @@ Import `AuthCommonModule` in your root `AppModule` using `forRoot()`:
 // app.module.ts
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { AuthCommonModule, OrchestratorGuard } from '@may-salguedo/auth-common';
+import { AuthCommonModule, OrchestratorGuard } from '@MaySalguedo/auth-common';
 
 @Module({
   imports: [
@@ -175,7 +177,7 @@ You can also inject and use it directly:
 
 ```typescript
 import { UseGuards } from '@nestjs/common';
-import { JwtGuard } from '@may-salguedo/auth-common';
+import { JwtGuard } from '@MaySalguedo/auth-common';
 
 @Controller('protected')
 @UseGuards(JwtGuard)
@@ -192,7 +194,7 @@ Marks a route or an entire controller as **publicly accessible**, bypassing the 
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';
-import { PublicGuard } from '@may-salguedo/auth-common';
+import { PublicGuard } from '@MaySalguedo/auth-common';
 
 @Controller('auth')
 export class AuthController {
@@ -220,13 +222,13 @@ export class PublicController {}
 
 ### `@UseGuards()`
 
-> ⚠️ This is **not** NestJS's built-in `@UseGuards()`. Import it from `@may-salguedo/auth-common` to work with the orchestrator.
+> ⚠️ This is **not** NestJS's built-in `@UseGuards()`. Import it from `@MaySalguedo/auth-common` to work with the orchestrator.
 
 Specifies which named guard(s) the `OrchestratorGuard` should execute for a given route. Guards are executed **sequentially** — all must pass for the request to proceed.
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';
-import { UseGuards } from '@may-salguedo/auth-common';
+import { UseGuards } from '@MaySalguedo/auth-common';
 
 @Controller('admin')
 export class AdminController {
@@ -247,13 +249,87 @@ Named keys must match the keys provided in the `guards` option of `forRoot()`.
 
 ---
 
+### `@RequireAttribute()`
+
+Declaratively require that the verified JWT payload (`request.user` from `JwtStrategy`) contains a specific attribute. Validation runs **inside `JwtGuard` after token verification** — no extra guard registration, no handler-level `if` checks.
+
+```typescript
+import { Controller, Get } from '@nestjs/common';
+import { RequireAttribute } from '@MaySalguedo/auth-common';
+
+@Controller('reports')
+export class ReportsController {
+  // scalar top-level: payload { role: 'admin' }
+  @RequireAttribute('role', 'admin')
+  @Get('admin')
+  getAdmin() {}
+
+  // nested dot-path: payload { organization: { plan: 'pro' } }
+  @RequireAttribute('organization.plan', 'pro')
+  @Get('billing')
+  getBilling() {}
+
+  // array payload + scalar expected: payload { roles: ['admin','editor'] }
+  @RequireAttribute('roles', 'admin')
+  @Get('editor')
+  getEditor() {}
+
+  // array expected requires EVERY value: payload { permissions: ['read','write'] }
+  @RequireAttribute('permissions', ['read', 'write'])
+  @Get('write')
+  getWrite() {}
+
+  // nested + array flattening: payload { orgs: [{role:'viewer'}, {role:'admin'}] }
+  @RequireAttribute('orgs.role', 'admin')
+  @Get('org-admin')
+  getOrgAdmin() {}
+}
+```
+
+**Behavior:**
+
+| Payload shape | Decorator | Result |
+|---|---|---|
+| `{ roles: ['admin','editor'] }` | `@RequireAttribute('roles','admin')` | ✅ pass (`includes`) |
+| `{ roles: ['editor'] }` | `@RequireAttribute('roles','admin')` | ❌ `403 Forbidden` |
+| `{ permissions: ['read','write','delete'] }` | `@RequireAttribute('permissions',['read','write'])` | ✅ pass (`EVERY`) |
+| `{ permissions: ['read'] }` | `@RequireAttribute('permissions',['read','write'])` | ❌ `403` (not all present) |
+| `{ orgs: [{role:'admin'}] }` | `@RequireAttribute('orgs.role','admin')` | ✅ pass (flattened `orgs[*].role`) |
+| `{}` or `{ organization: null }` | `@RequireAttribute('organization.plan','pro')` | ❌ `403` — no crash, message includes path |
+
+**Composition:**
+
+* Stack multiple decorators — they are **AND**-composed (all must pass, order independent):
+  ```typescript
+  @RequireAttribute('roles', 'admin')
+  @RequireAttribute('tenant', 'acme')
+  @Get('dashboard')
+  getDashboard() {} // requires both
+  ```
+* Works at **handler or controller level** — controller-level applies to all routes.
+* `@PublicGuard()` still bypasses (`OrchestratorGuard` checks `IS_PUBLIC_KEY` first) — no attribute evaluation.
+
+**Errors:**
+Failures throw `ForbiddenException` (`403`) with deterministic message:
+```
+Attribute 'organization.plan' expected "pro" but got undefined
+Attribute 'roles' expected "admin" but got ["editor"]
+```
+
+**Scope limits (v1):**
+* Strict equality (`===`) + array semantics only — no regex/comparator injection.
+* No OR combinators — use separate routes or a custom guard for complex logic.
+* Validation only — no payload mutation (use `validate` option for enrichment).
+
+---
+
 ## Custom Payload Validation
 
 By default, `JwtStrategy` returns the decoded JWT payload as-is. Provide a `validate` function to enrich the payload (e.g. fetch the user from a database) or reject it by throwing an exception.
 
 ```typescript
 // app.module.ts
-import { AuthCommonModule } from '@may-salguedo/auth-common';
+import { AuthCommonModule } from '@MaySalguedo/auth-common';
 import { UnauthorizedException } from '@nestjs/common';
 
 interface MyPayload {
@@ -347,7 +423,7 @@ Your custom payload type is always intersected with `TokenIssues` when received 
 An `HttpException` that produces a **`424 Failed Dependency`** response. Useful inside `validate()` when the auth failure is caused by a downstream dependency (e.g. user service unavailable) rather than an invalid token.
 
 ```typescript
-import { FailedDependencyException } from '@may-salguedo/auth-common';
+import { FailedDependencyException } from '@MaySalguedo/auth-common';
 
 validate: async (payload) => {
   const user = await userService.find(payload.sub).catch(() => {
@@ -376,10 +452,11 @@ The following DI injection tokens are exported for advanced scenarios where you 
 | `GUARD_REGISTRY` | `Record<string, CanActivate>` | Map of all registered named guards, including `'jwt'`. |
 | `IS_PUBLIC_KEY` | `string` | Metadata key used by `@PublicGuard()`. |
 | `USE_GUARDS_KEY` | `string` | Metadata key used by `@UseGuards()`. |
+| `REQUIRE_ATTRIBUTE_KEY` | `string` | Metadata key used by `@RequireAttribute()`. |
 
 ```typescript
 import { Inject } from '@nestjs/common';
-import { GUARD_REGISTRY } from '@may-salguedo/auth-common';
+import { GUARD_REGISTRY } from '@MaySalguedo/auth-common';
 
 @Injectable()
 export class MyService {
@@ -510,7 +587,7 @@ pnpm compile
 Creates a `.tgz` archive and prints its absolute path -- perfect for CI or for local installation in another project:
 
 ```bash
-pnpm install /absolute/path/to/may-salguedo-auth-common-#.#.#.tgz
+pnpm install /absolute/path/to/MaySalguedo-auth-common-#.#.#.tgz
 ```
 
 <div align="center">
