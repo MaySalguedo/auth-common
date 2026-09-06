@@ -8,9 +8,11 @@ export * from './common/tokens/default-guard.token';
 export * from './common/tokens/jwt-secret.token';
 export * from './common/tokens/is-public-key.token';
 export * from './common/tokens/use-guards-key.token';
+export * from './common/tokens/require-attribute-key.token';
 
 export * from './common/decorators/public-guard.decorator';
 export * from './common/decorators/use-guard.decorator';
+export * from './common/decorators/require-attribute.decorator';
 
 export * from './common/exceptions/failed-dependency.exception';
 

@@ -5,7 +5,8 @@
 			"@guards/*": ["src/core/guards/*"],
 			"@decorators/*": ["src/common/decorators/*"],
 			"@interfaces/*": ["src/common/interfaces/*"],
-			"@strategies/*": ["src/core/strategies/*"]
+			"@strategies/*": ["src/core/strategies/*"],
+			"@utils/*": ["src/common/utils/*"]
 		},
 		"module": "commonjs",
 		"declaration": true,
@@ -25,7 +26,8 @@
 		"strictBindCallApply": false,
 		"noFallthroughCasesInSwitch": false,
 		"esModuleInterop": true,
-		"resolveJsonModule": true
+		"resolveJsonModule": true,
+		"isolatedModules": true
 	},
 	"exclude": ["node_modules", "dist", "test"]
 }
