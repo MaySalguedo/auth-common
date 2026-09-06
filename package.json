@@ -1,5 +1,5 @@
 {
-  "name": "@may-salguedo/auth-common",
+  "name": "@MaySalguedo/auth-common",
   "version": "1.0.7",
   "description": "Common authentication modules for NestJS microservices (guards, strategies, JWT validation)",
   "license": "EPL-2.0",
