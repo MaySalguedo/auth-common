@@ -34,7 +34,7 @@
     "lint:no-spec": "eslint \"src/**/*.ts\" --fix --ignore-pattern \"*.spec.ts\"",
     "format": "prettier --write \"src/**/*.ts\"",
     "audit": "pnpm audit --audit-level=low",
-    "audit:trivy": "trivy fs --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --scanners vuln,misconfig,license --skip-dirs node_modules .",
+    "audit:trivy": "trivy fs --timeout 15m --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --scanners vuln,misconfig,license --skip-dirs node_modules --skip-dirs coverage --skip-dirs .cache .",
     "check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

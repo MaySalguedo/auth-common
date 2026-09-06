@@ -28,6 +28,7 @@ Plug-and-play JWT authentication infrastructure for **NestJS microservices**. On
 - [Decorators](#decorators)
   - [`@PublicGuard()`](#publicguard)
   - [`@UseGuards()`](#useguards)
+  - [`@RequireAttribute()`](#requireattribute)
 - [Custom Payload Validation](#custom-payload-validation)
 - [Custom Guards](#custom-guards)
 - [Interfaces & Types](#interfaces--types)
@@ -58,6 +59,7 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 - 🌐 **Public route bypass** — mark any endpoint with `@PublicGuard()` to skip auth entirely.
 - 🔌 **Extensible** — register any number of custom guards (`api-key`, `roles`, `subscription`) alongside JWT.
 - 🧩 **Custom payload validation** — inject your own `validate()` function to enrich or reject the decoded token payload.
+- ✅ **Attribute validation** — declaratively require JWT payload attributes (nested + array-aware) via `@RequireAttribute()` enforced in `JwtGuard`.
 - 📦 **Minimal peer dependencies** — only requires the standard NestJS core packages.
 
 ---
@@ -247,6 +249,80 @@ Named keys must match the keys provided in the `guards` option of `forRoot()`.
 
 ---
 
+### `@RequireAttribute()`
+
+Declaratively require that the verified JWT payload (`request.user` from `JwtStrategy`) contains a specific attribute. Validation runs **inside `JwtGuard` after token verification** — no extra guard registration, no handler-level `if` checks.
+
+```typescript
+import { Controller, Get } from '@nestjs/common';
+import { RequireAttribute } from '@MaySalguedo/auth-common';
+
+@Controller('reports')
+export class ReportsController {
+  // scalar top-level: payload { role: 'admin' }
+  @RequireAttribute('role', 'admin')
+  @Get('admin')
+  getAdmin() {}
+
+  // nested dot-path: payload { organization: { plan: 'pro' } }
+  @RequireAttribute('organization.plan', 'pro')
+  @Get('billing')
+  getBilling() {}
+
+  // array payload + scalar expected: payload { roles: ['admin','editor'] }
+  @RequireAttribute('roles', 'admin')
+  @Get('editor')
+  getEditor() {}
+
+  // array expected requires EVERY value: payload { permissions: ['read','write'] }
+  @RequireAttribute('permissions', ['read', 'write'])
+  @Get('write')
+  getWrite() {}
+
+  // nested + array flattening: payload { orgs: [{role:'viewer'}, {role:'admin'}] }
+  @RequireAttribute('orgs.role', 'admin')
+  @Get('org-admin')
+  getOrgAdmin() {}
+}
+```
+
+**Behavior:**
+
+| Payload shape | Decorator | Result |
+|---|---|---|
+| `{ roles: ['admin','editor'] }` | `@RequireAttribute('roles','admin')` | ✅ pass (`includes`) |
+| `{ roles: ['editor'] }` | `@RequireAttribute('roles','admin')` | ❌ `403 Forbidden` |
+| `{ permissions: ['read','write','delete'] }` | `@RequireAttribute('permissions',['read','write'])` | ✅ pass (`EVERY`) |
+| `{ permissions: ['read'] }` | `@RequireAttribute('permissions',['read','write'])` | ❌ `403` (not all present) |
+| `{ orgs: [{role:'admin'}] }` | `@RequireAttribute('orgs.role','admin')` | ✅ pass (flattened `orgs[*].role`) |
+| `{}` or `{ organization: null }` | `@RequireAttribute('organization.plan','pro')` | ❌ `403` — no crash, message includes path |
+
+**Composition:**
+
+* Stack multiple decorators — they are **AND**-composed (all must pass, order independent):
+  ```typescript
+  @RequireAttribute('roles', 'admin')
+  @RequireAttribute('tenant', 'acme')
+  @Get('dashboard')
+  getDashboard() {} // requires both
+  ```
+* Works at **handler or controller level** — controller-level applies to all routes.
+* `@PublicGuard()` still bypasses (`OrchestratorGuard` checks `IS_PUBLIC_KEY` first) — no attribute evaluation.
+
+**Errors:**
+Failures throw `ForbiddenException` (`403`) with deterministic message:
+```
+Attribute 'organization.plan' expected "pro" but got undefined
+Attribute 'roles' expected "admin" but got ["editor"]
+```
+
+**Scope limits (v1):**
+* Strict equality (`===`) + array semantics only — no regex/comparator injection.
+* No OR combinators — use separate routes or a custom guard for complex logic.
+* Validation only — no payload mutation (use `validate` option for enrichment).
+
+---
+
 ## Custom Payload Validation
 
 By default, `JwtStrategy` returns the decoded JWT payload as-is. Provide a `validate` function to enrich the payload (e.g. fetch the user from a database) or reject it by throwing an exception.
@@ -376,6 +452,7 @@ The following DI injection tokens are exported for advanced scenarios where you 
 | `GUARD_REGISTRY` | `Record<string, CanActivate>` | Map of all registered named guards, including `'jwt'`. |
 | `IS_PUBLIC_KEY` | `string` | Metadata key used by `@PublicGuard()`. |
 | `USE_GUARDS_KEY` | `string` | Metadata key used by `@UseGuards()`. |
+| `REQUIRE_ATTRIBUTE_KEY` | `string` | Metadata key used by `@RequireAttribute()`. |
 
 ```typescript
 import { Inject } from '@nestjs/common';

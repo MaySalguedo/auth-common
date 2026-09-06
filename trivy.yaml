@@ -6,6 +6,7 @@ severity:
   - CRITICAL
 exit-code: 1
 format: table
+timeout: 15m
 scan:
   scanners:
     - vuln
@@ -13,3 +14,6 @@ scan:
     - license
   skip-dirs:
     - node_modules
+    - coverage
+    - .cache
+    - .tmp
