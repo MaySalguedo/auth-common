@@ -3,7 +3,7 @@
   "version": "1.0.7",
   "description": "Common authentication modules for NestJS microservices (guards, strategies, JWT validation)",
   "license": "EPL-2.0",
-  "packageManager": "pnpm@10.8.1",
+  "packageManager": "pnpm@11.25.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MaySalguedo/auth-common.git"
@@ -49,6 +49,7 @@
     "rxjs": "^7.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
@@ -107,7 +108,8 @@
       "^@guards/(.*)$": "<rootDir>/core/guards/$1",
       "^@decorators/(.*)$": "<rootDir>/common/decorators/$1",
       "^@interfaces/(.*)$": "<rootDir>/common/interfaces/$1",
-      "^@strategies/(.*)$": "<rootDir>/core/strategies/$1"
+      "^@strategies/(.*)$": "<rootDir>/core/strategies/$1",
+      "^@utils/(.*)$": "<rootDir>/common/utils/$1"
     }
   }
 }
