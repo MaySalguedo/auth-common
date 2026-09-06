@@ -101,7 +101,7 @@ import { RequireAttribute } from '@MaySalguedo/auth-common';
 @Get('admin') getAdmin() {}
 
 # 4. Release: write RELEASE_NOTES.md, then tag
-git tag v1.0.8 && git push origin v2.0.0 # triggers CD: wait-for-ci → setup → trivy-scan → publish-npmjs + publish-github → release --notes-file
+git tag v1.0.8 && git push origin v1.0.8 # triggers CD: wait-for-ci → setup → trivy-scan → publish-npmjs + publish-github → release --notes-file
 ```
 
 ## What's Changed — Commits & PRs
