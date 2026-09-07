@@ -31,7 +31,7 @@ This release consolidates CI/CD modernization, GH Packages scope handling, and t
 - `src/core/guards/jwt/jwt.guard.spec.ts:1` (299 new lines), `src/common/utils/utils.spec.ts:1` (253 lines), `src/common/decorators/decorators.spec.ts:1` (219 lines), `src/core/guards/orchestrator/orchestrator.guard.spec.ts:27` — full AC1-AC10 + edge harness (`null`, `undefined`, `[]`, `{}`, malformed `a..b`)
 - `tsconfig.json:6` — `@utils/*` alias + `isolatedModules`, `jest` config aligned
 - `README.md` — new `## Features` bullet `✅ Attribute validation`, `Table of Contents` → `@RequireAttribute()`, full `### @RequireAttribute()` section with examples, behavior table (`includes` vs `EVERY`, `403` handling, `@PublicGuard` bypass), `Token Reference` adds `REQUIRE_ATTRIBUTE_KEY`
-- `.gitignore:62-63` — keep local pitch draft `issue.md`/`pull_request.md` out of index
+- `.gitignore:62-63` — keep local pitch draft `ISSUE.md`/`PULL_REQUEST.md` out of index
 
 **Usage:**
 ```typescript
@@ -75,7 +75,7 @@ import { RequireAttribute } from '@may-salguedo/auth-common';
 
 - `PR Templates`: `.github/PULL_REQUEST_TEMPLATE/feature.md`, `fix.md`, `chore.md` (generic/referential, no UI, `Related to #` without auto-close)
 - `Issue Templates`: `.github/ISSUE_TEMPLATE/chore_request.md` (`labels: chore`, sections Context→Additional Context) alongside `feature_request.md` (`labels: enhancement`)
-- `.gitignore:62-64` — `pull_request.md` + `issue.md` local drafts ignored, `.github/PULL_REQUEST_TEMPLATE/` untracked until added
+- `.gitignore:62-64` — `PULL_REQUEST.md` + `ISSUE.md` local drafts ignored, `.github/PULL_REQUEST_TEMPLATE/` untracked until added
 - `README.md:252-341,455,509-532` — comprehensive `RequireAttribute` showcase, `REQUIRE_ATTRIBUTE_KEY` token, recent `pnpm pack`/`compile` docs
 
 ---

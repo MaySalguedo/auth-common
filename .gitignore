@@ -60,5 +60,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .cache/act/
 
 # local pitch draft — not committed
-issue.md
-pull_request.md
+ISSUE.md
+PULL_REQUEST.md
