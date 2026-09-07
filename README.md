@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-^5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Passport](https://img.shields.io/badge/Passport--JWT-4.0-34E27A?style=for-the-badge&logo=passport&logoColor=white)](http://www.passportjs.org)
 [![License: EPL-2.0](https://img.shields.io/badge/License-EPL--2.0-yellow?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)]()
+[![Version](https://img.shields.io/badge/version-1.1.0-blue?style=for-the-badge)]()
 
 Plug-and-play JWT authentication infrastructure for **NestJS microservices**. One module registration wires up guards, strategies, and a runtime guard orchestrator — so your services share a consistent auth layer without repeating boilerplate.
 
@@ -643,6 +643,8 @@ pnpm install /absolute/path/to/may-salguedo-auth-common-#.#.#.tgz
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow: setup, branches, commits, checks, pull requests, and releases.
+
+Please read our [Code of Conduct](./CODE_OF_CONDUCT.md) — by participating you agree to abide by it.
 
 ---
 

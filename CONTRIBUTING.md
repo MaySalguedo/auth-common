@@ -2,6 +2,8 @@
 
 Thank you for contributing. This guide covers the full workflow: setup, branches, commits, checks, pull requests, and releases.
 
+All contributors are expected to follow the [Code of Conduct](./CODE_OF_CONDUCT.md).
+
 ## Prerequisites
 
 - Node.js 24 (see `.github/workflows/ci.yml`)
