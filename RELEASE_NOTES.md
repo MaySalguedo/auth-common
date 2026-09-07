@@ -1,112 +1,94 @@
-# Release Notes — v1.0.9
+# Release Notes — v1.1.0
 
-> **Target:** `develop` → `main` | **Date:** 2026-09-06 | **Scope:** `@may-salguedo/auth-common` (npmjs) / `@MaySalguedo/auth-common` (GH Packages) | **Compare:** `main...develop`
+> **Target:** `develop` → `main` | **Date:** 2026-09-07 | **Scope:** `@may-salguedo/auth-common` (npmjs) / `@MaySalguedo/auth-common` (GH Packages) | **Compare:** `main...develop`
 
-This release consolidates CI/CD modernization, GH Packages scope handling, and the new declarative JWT attribute validation feature into a single curated release.
+This release adds the generic `@AuthUser()` parameter decorator for typed `req.user` access, plus the contributor guide and matching README coverage. Fully additive — no breaking changes.
 
 ---
 
 ## Highlights
 
-- **New Feature:** `@RequireAttribute()` — declarative per-route JWT payload validation (nested + array-aware) enforced in `JwtGuard` — `feat(auth): RequireAttribute` (#2)
-- **Chore:** Package scope handling restored — `package.json:2` stays `@may-salguedo/auth-common` for npmjs (`may-salguedo` account), GH Packages publishes as `@MaySalguedo/auth-common` via `scripts/publish-github-packages.sh:2` `jq` rewrite for case-sensitive `PUT` — `chore(release): restore scope` (#4)
-- **CI/CD:** CI now runs on every branch (`ci.yml:3-6` `branches: ['**']`), release is file-driven via `RELEASE_NOTES.md` (`cd.yml:134` `--notes-file`), `jq` rewrite kept for GH Packages
-- **DX:** New PR and Issue templates (`PULL_REQUEST_TEMPLATE/`, `ISSUE_TEMPLATE/chore_request.md`), `README.md` showcases `RequireAttribute` with tables and error format
+- **New Feature:** `@AuthUser()` — generic handler-param injection of `req.user`, covering object payloads (`T & TokenIssues`) and raw JWT strings, with no `@Req()` import — `feat(decorator): AuthUser` (#7, related to #6)
+- **DX:** New `CONTRIBUTING.md` (setup, branches, commits, `act`-based checks, PRs + forks, releases) and `README.md` `@AuthUser()` showcase with behavior table
+- **Chore:** Gitignored local drafts renamed to `ISSUE.md` / `PULL_REQUEST.md` (`.gitignore:63-64`), version bumped to `1.1.0`
 
 ---
 
 ## Detailed Changes
 
-### 1. Features — `feat(auth): add RequireAttribute decorator` (#2) — `Related to #1`
+### 1. Features — `feat(decorator): add AuthUser param decorator` (#7) — `Related to #6`
 
-**Motivation:** Services using `AuthCommonModule.forRoot()` + `OrchestratorGuard`/`JwtGuard` had no declarative way to require a JWT payload attribute (especially nested `organization.plan` or arrays `roles: ['admin','editor']`, `orgs: [{role:'admin'}]`). Workaround was duplicated `if (!user.roles?.includes('admin')) throw ForbiddenException` per handler or bespoke per-attribute `CanActivate`.
+**Motivation:** Every protected handler imported `@Req()` / `@Request()` from `@nestjs/common` just to reach `req.user`, then manually cast it to the caller's payload type. Repetitive, untyped by default, and easy to drift between `object + TokenIssues` vs `string` JWT usages. No helper existed in `src/index.ts` or `src/common/decorators/`.
 
 **Implementation:**
-- `src/common/tokens/require-attribute-key.token.ts:1` — new `REQUIRE_ATTRIBUTE_KEY` metadata token
-- `src/common/interfaces/require-attribute-rule.interface.ts:4` — `RequireAttributeRule { path: string, value: unknown }`
-- `src/common/decorators/require-attribute.decorator.ts:5` — `RequireAttribute(path, value): MethodDecorator & ClassDecorator` with stacking via `Reflect.getMetadata` + `SetMetadata([...existing, {path,value}])` for both method and class level
-- `src/common/utils/get-nested-value.ts:1` — `getFlattenedByPath(obj, path)` (dot-path split, `filter(Boolean)`, array flattening), `matchesAttribute(actual: unknown[], expected: unknown)` (`Array.isArray(expected) ? every includes : includes`), `formatAttributeValue`
-- `src/core/guards/jwt/jwt.guard.ts:12` — `JwtGuard.canActivate` now after `super.canActivate`: `reflector.getAllAndOverride(REQUIRE_ATTRIBUTE_KEY, [handler, class])`, iterates rules, `getFlattenedByPath(user, path)`, `matchesAttribute`, throws `ForbiddenException` with `Attribute '${path}' expected ${formatAttributeValue(value)} but got ${formatAttributeValue(actual)}`
-- `src/index.ts:11,15` — exports `REQUIRE_ATTRIBUTE_KEY` and `RequireAttribute`
-- `src/core/guards/jwt/jwt.guard.spec.ts:1` (299 new lines), `src/common/utils/utils.spec.ts:1` (253 lines), `src/common/decorators/decorators.spec.ts:1` (219 lines), `src/core/guards/orchestrator/orchestrator.guard.spec.ts:27` — full AC1-AC10 + edge harness (`null`, `undefined`, `[]`, `{}`, malformed `a..b`)
-- `tsconfig.json:6` — `@utils/*` alias + `isolatedModules`, `jest` config aligned
-- `README.md` — new `## Features` bullet `✅ Attribute validation`, `Table of Contents` → `@RequireAttribute()`, full `### @RequireAttribute()` section with examples, behavior table (`includes` vs `EVERY`, `403` handling, `@PublicGuard` bypass), `Token Reference` adds `REQUIRE_ATTRIBUTE_KEY`
-- `.gitignore:62-63` — keep local pitch draft `issue.md`/`pull_request.md` out of index
+- `src/common/decorators/auth-user.decorator.ts:3` — `extractAuthUser<T>(ctx)`, reads `req.user` via `switchToHttp().getRequest()`, returns `undefined` when absent, never throws
+- `src/common/decorators/auth-user.decorator.ts:8` — `authUserFactory<T>(_data, ctx)` named `createParamDecorator` factory, directly unit-testable
+- `src/common/decorators/auth-user.decorator.ts:15` — `AuthUser<T = unknown>()`, generic decorator factory: `@AuthUser<MyPayload>()` / `@AuthUser<string>()`
+- `src/common/decorators/decorators.spec.ts` — consolidated `extractAuthUser` + `AuthUser` suites (object + `TokenIssues`, string JWT, missing user, missing request, factory independence)
+- `src/index.ts:16` — barrel export for the new decorator
 
 **Usage:**
 ```typescript
-import { RequireAttribute } from '@may-salguedo/auth-common';
+import { AuthUser, TokenIssues } from '@may-salguedo/auth-common';
 
-@RequireAttribute('role', 'admin') // scalar
-@RequireAttribute('organization.plan', 'pro') // nested
-@RequireAttribute('roles', 'admin') // array includes
-@RequireAttribute('permissions', ['read','write']) // array EVERY
-@RequireAttribute('orgs.role', 'admin') // flattened
-@Get('admin') getAdmin() {}
+interface MyPayload { sub: string; role: string; }
 
-// stacked = AND
-@RequireAttribute('roles','admin')
-@RequireAttribute('tenant','acme')
-@Get('dashboard') getDashboard() {}
+// object payload: { sub: '123', role: 'admin', iat: 1, exp: 2 }
+@Get('me') getMe(@AuthUser<MyPayload>() user: MyPayload & TokenIssues) {}
+
+// raw JWT string
+@Get('token') getToken(@AuthUser<string>() token: string) {}
+
+// public route without user → undefined, no throw
+@PublicGuard()
+@Get('open') getOpen(@AuthUser<MyPayload>() user: MyPayload & TokenIssues | undefined) {}
 ```
 
-**Verified:** `pnpm test`/`pnpm test:cov` ≥90% (`package.json:82`), `pnpm lint:no-spec`/`pnpm check` green, bench ≤2ms per call, no new `eslint` errors.
+**Verified:** `pnpm test`/`pnpm test:cov` 144/144 across 8 suites (`auth-user.decorator.ts` 100% stmts/branches/funcs/lines, global ≥90% per `package.json`), `pnpm lint:no-spec`/`pnpm check`/`pnpm build` green, root export resolves from `dist/index.js`.
 
-**Merged:** `b9f978a` → `fcb09c5` → `Merge #2` `413f66a`
+**Merged:** `08a273d` → `Merge #7` `ac7693b` — `Related to #6`
 
-### 2. Chore — `chore(release): restore package scope and streamline CI/CD` (#4)
+### 2. Docs — `docs(contributing): guide + showcase`
 
-**Motivation:** `ci.yml` only `main`/`develop` delayed feedback; GH Packages case-sensitive `MaySalguedo` requires `jq` rewrite while npmjs stays `@may-salguedo`; `--generate-notes` did not allow curated `RELEASE_NOTES.md`; docs drifted.
+**Motivation:** `README.md` had no `@AuthUser()` documentation, no contributor workflow existed, and the `Table of Contents` linked to a missing `## Contributing` section.
 
 **Implementation:**
-- `ci.yml:3-6` — `on: push: branches: ['**']` + `pull_request:` (no base filter), keep `concurrency: cancel-in-progress`, `test-coverage` stays gated `ci.yml:77-81` (`main`/`develop` only) to limit Docker cost
-- `package.json:2` — `"name": "@may-salguedo/auth-common"` stays for npmjs account `may-salguedo` (scope `may-salguedo`)
-- `scripts/publish-github-packages.sh:2` — keep `jq '.name = "@MaySalguedo/auth-common"'` rewrite for GH Packages `https://npm.pkg.github.com` (`@MaySalguedo:registry` + auth token, `npm publish --access public`)
-- `cd.yml:134` — `gh release create "${{ github.ref_name }}" --notes-file RELEASE_NOTES.md --target "${{ github.sha }}"` (file-driven, you write `RELEASE_NOTES.md` before tag)
-- `README.md:3,68,89,178,195,223,229,256,350,382,513` — all installs/imports `@may-salguedo/auth-common`, `pnpm install /.../may-salguedo-auth-common-*.tgz`
-- `pnpm-lock.yaml` refresh (557 lines) from `pnpm install`
-- `pnpm pack` now `may-salguedo-auth-common-*.tgz`
+- `CONTRIBUTING.md:1` (new) — prerequisites (Node 24, pnpm 11.25), layout + path aliases, `feat/*` branching off `develop`, conventional commits, `act`-based CI checks, fork-PR flow, maintainer-only releases
+- `README.md` — new `### @AuthUser()` section with object + string examples, behavior table, and v1 scope limits; ToC, Features, and Overview entries; missing `## Contributing` section added
+- `.gitignore:63-64` — local drafts renamed `issue.md`/`pull_request.md` → `ISSUE.md`/`PULL_REQUEST.md` with all references updated (`CONTRIBUTING.md`, release notes)
+- `package.json:3` + `README.md:9` — version bumped to `1.1.0`, badge refreshed
 
-**Verified:** `pnpm build` → `may-salguedo-auth-common-1.0.7.tgz`, `pnpm lint:no-spec`/`pnpm check` green, `act` CI simulation passes.
+**Verified:** `pnpm check` green (docs-only, no `src/` change), zero stale lowercase draft references (grep clean), renamed drafts still gitignored (`git check-ignore` verified).
 
-**Merged:** `07dc022` → `Merge #4` `fcebf1a`
-
-### 3. Templates & Tooling
-
-- `PR Templates`: `.github/PULL_REQUEST_TEMPLATE/feature.md`, `fix.md`, `chore.md` (generic/referential, no UI, `Related to #` without auto-close)
-- `Issue Templates`: `.github/ISSUE_TEMPLATE/chore_request.md` (`labels: chore`, sections Context→Additional Context) alongside `feature_request.md` (`labels: enhancement`)
-- `.gitignore:62-64` — `pull_request.md` + `issue.md` local drafts ignored, `.github/PULL_REQUEST_TEMPLATE/` untracked until added
-- `README.md:252-341,455,509-532` — comprehensive `RequireAttribute` showcase, `REQUIRE_ATTRIBUTE_KEY` token, recent `pnpm pack`/`compile` docs
+**Merged:** `6bd11f2` + version bump — on `develop`, release PR pending.
 
 ---
 
 ## Breaking Changes
 
-- **Package scope:** No breaking rename — `@may-salguedo/auth-common` stays for npmjs account `may-salguedo` (scope `may-salguedo`). GH Packages publishes as `@MaySalguedo/auth-common` via `jq` rewrite — consumers keep `pnpm add @may-salguedo/auth-common` / `from '@may-salguedo/auth-common'`.
+- **API:** None — purely additive export. Existing `@Req()` + cast code keeps working unchanged.
 - **Release process:** `RELEASE_NOTES.md` must be committed before `git tag v*` — `cd.yml:134` will fail if missing (intentional, curated notes).
 
 ## Migration Guide
 
 ```bash
-# No package migration — scope stays @may-salguedo/auth-common for npmjs account may-salguedo
+# No package migration — scope stays @may-salguedo/auth-common
 
-# Optional: Adopt RequireAttribute (replace manual if checks)
-import { RequireAttribute } from '@may-salguedo/auth-common';
-@RequireAttribute('roles','admin')
-@Get('admin') getAdmin() {}
+# Optional: Adopt AuthUser (replace manual req.user casts)
+import { AuthUser, TokenIssues } from '@may-salguedo/auth-common';
+@Get('me') getMe(@AuthUser<MyPayload>() user: MyPayload & TokenIssues) {}
 
 # Release: write RELEASE_NOTES.md, then tag
-git tag v1.0.9 && git push origin v1.0.9 # triggers CD: wait-for-ci → setup → trivy-scan → publish-npmjs + publish-github → release --notes-file
+git tag v1.1.0 && git push origin v1.1.0 # triggers CD: wait-for-ci → setup → trivy-scan → publish-npmjs + publish-github → release --notes-file
 ```
 
 ## What's Changed — Commits & PRs
 
-- `feat(auth): RequireAttribute` (#2) — `b9f978a`, `c73cab6`, `fcb09c5`, merge `413f66a` — `Related to #1`
-- `chore(release): restore package scope` (#4) — `07dc022`, `d8d8818`, merge `fcebf1a` — `Closes chore issue #3`
-- `feat(templates): PULL_REQUEST_TEMPLATE` — `c73cab6`
-- `feat(template): chore issue template` — `d8d8818`
+- `feat(decorator): AuthUser` (#7) — `08a273d`, merge `ac7693b` — `Related to #6`
+- `docs(contributing): guide + showcase + renames` — `6bd11f2`
+- `chore(release): bump to v1.1.0` — `package.json:3`, `README.md:9` badge, this file
 
-Full diff: `main...develop` — 26 files, +1375/-400, 1246 new test lines.
+Full diff: `main...develop` — 10 files, +430/-10 approx (feature + docs + version).
 
 ## Contributors
 
@@ -118,5 +100,5 @@ Full diff: `main...develop` — 26 files, +1375/-400, 1246 new test lines.
 ## Checklist for Release
 
 - [x] `RELEASE_NOTES.md` committed (this file)
-- [ ] `git tag v1.0.9 && git push origin v1.0.9` triggers `cd.yml`
-- [ ] Verify `npm view @may-salguedo/auth-common version` and `GH Packages @MaySalguedo/auth-common` + `gh release view v1.0.9 --json body` matches this file
+- [ ] `git tag v1.1.0 && git push origin v1.1.0` triggers `cd.yml`
+- [ ] Verify `npm view @may-salguedo/auth-common version` and `GH Packages @MaySalguedo/auth-common` + `gh release view v1.1.0 --json body` matches this file

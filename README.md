@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-^5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Passport](https://img.shields.io/badge/Passport--JWT-4.0-34E27A?style=for-the-badge&logo=passport&logoColor=white)](http://www.passportjs.org)
 [![License: EPL-2.0](https://img.shields.io/badge/License-EPL--2.0-yellow?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)]()
+[![Version](https://img.shields.io/badge/version-1.1.0-blue?style=for-the-badge)]()
 
 Plug-and-play JWT authentication infrastructure for **NestJS microservices**. One module registration wires up guards, strategies, and a runtime guard orchestrator — so your services share a consistent auth layer without repeating boilerplate.
 
@@ -29,6 +29,7 @@ Plug-and-play JWT authentication infrastructure for **NestJS microservices**. On
   - [`@PublicGuard()`](#publicguard)
   - [`@UseGuards()`](#useguards)
   - [`@RequireAttribute()`](#requireattribute)
+  - [`@AuthUser()`](#authuser)
 - [Custom Payload Validation](#custom-payload-validation)
 - [Custom Guards](#custom-guards)
 - [Interfaces & Types](#interfaces--types)
@@ -48,7 +49,7 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 - Registers a `JwtStrategy` backed by `passport-jwt`.
 - Provides a `JwtGuard` extending NestJS's `AuthGuard('jwt')`.
 - Wires an **`OrchestratorGuard`** — a smart global guard that reads route metadata and delegates to the correct named guard at runtime.
-- Exposes clean decorators (`@PublicGuard()`, `@UseGuards()`) for per-route control.
+- Exposes clean decorators (`@PublicGuard()`, `@UseGuards()`, `@RequireAttribute()`, `@AuthUser()`) for per-route control.
 
 ---
 
@@ -60,6 +61,7 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 - 🔌 **Extensible** — register any number of custom guards (`api-key`, `roles`, `subscription`) alongside JWT.
 - 🧩 **Custom payload validation** — inject your own `validate()` function to enrich or reject the decoded token payload.
 - ✅ **Attribute validation** — declaratively require JWT payload attributes (nested + array-aware) via `@RequireAttribute()` enforced in `JwtGuard`.
+- 👤 **Typed user injection** — read `request.user` directly as a handler parameter with full generic type safety via `@AuthUser()`.
 - 📦 **Minimal peer dependencies** — only requires the standard NestJS core packages.
 
 ---
@@ -320,6 +322,50 @@ Attribute 'roles' expected "admin" but got ["editor"]
 * Strict equality (`===`) + array semantics only — no regex/comparator injection.
 * No OR combinators — use separate routes or a custom guard for complex logic.
 * Validation only — no payload mutation (use `validate` option for enrichment).
+
+---
+
+### `@AuthUser()`
+
+Injects `request.user` directly as a handler parameter with an explicit generic — no `@Req()` / `@Request()` import, no manual cast. The generic covers both supported shapes: an object payload (typically `T & TokenIssues`) and a raw JWT `string`.
+
+```typescript
+import { Controller, Get } from '@nestjs/common';
+import { AuthUser, TokenIssues } from '@may-salguedo/auth-common';
+
+interface MyPayload {
+  sub: string;
+  role: string;
+}
+
+@Controller('users')
+export class UsersController {
+  // object payload: { sub: '123', role: 'admin', iat: 1, exp: 2 }
+  @Get('me')
+  getMe(@AuthUser<MyPayload>() user: MyPayload & TokenIssues) {
+    return user;
+  }
+
+  // raw JWT string
+  @Get('token')
+  getToken(@AuthUser<string>() token: string) {
+    return token;
+  }
+}
+```
+
+**Behavior:**
+
+| `req.user` shape | Decorator | Result |
+|---|---|---|
+| `{ sub: '123', role: 'admin', iat: 1, exp: 2 }` | `@AuthUser<MyPayload>()` | ✅ param strictly equals `req.user` |
+| `'eyJhbGciOi...'` (JWT string) | `@AuthUser<string>()` | ✅ param strictly equals the string |
+| missing (e.g. `@PublicGuard()` route) | `@AuthUser<MyPayload>()` | ✅ `undefined` — no throw |
+
+**Scope limits (v1):**
+* Whole user only — no property-path picking (e.g. `@AuthUser('sub')`).
+* No validation or transformation — guards and the `validate` option stay authoritative.
+* Missing user resolves to `undefined` — the handler or guard decides what to do.
 
 ---
 
@@ -591,6 +637,14 @@ pnpm install /absolute/path/to/may-salguedo-auth-common-#.#.#.tgz
 ```
 
 <div align="center">
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow: setup, branches, commits, checks, pull requests, and releases.
+
+Please read our [Code of Conduct](./CODE_OF_CONDUCT.md) — by participating you agree to abide by it.
 
 ---
 

@@ -1,9 +1,16 @@
+import { ExecutionContext } from '@nestjs/common';
 import { IS_PUBLIC_KEY } from '@tokens/is-public-key.token';
 import { USE_GUARDS_KEY } from '@tokens/use-guards-key.token';
 import { REQUIRE_ATTRIBUTE_KEY } from '@tokens/require-attribute-key.token';
+import { TokenIssues } from '@interfaces/token-issues.interface';
 import { PublicGuard } from './public-guard.decorator';
 import { UseGuards } from './use-guard.decorator';
 import { RequireAttribute } from './require-attribute.decorator';
+import {
+  AuthUser,
+  authUserFactory,
+  extractAuthUser,
+} from './auth-user.decorator';
 
 function applyToClass(decorator: ClassDecorator): unknown {
   const target = class TestController {};
@@ -215,5 +222,107 @@ describe('RequireAttribute decorator', () => {
     expect(
       Reflect.getMetadata(REQUIRE_ATTRIBUTE_KEY, target.prototype.handler),
     ).toEqual([{ path: 'methodAttr', value: 'y' }]);
+  });
+});
+
+describe('extractAuthUser', () => {
+  function mockContext(user?: unknown): ExecutionContext {
+    const request: { user?: unknown } = user === undefined ? {} : { user };
+    return {
+      switchToHttp: () => ({
+        getRequest: () => request,
+      }),
+    } as unknown as ExecutionContext;
+  }
+
+  it('should return the object payload with TokenIssues as-is', () => {
+    const user = { sub: '123', role: 'admin', iat: 1, exp: 2 };
+    expect(extractAuthUser<typeof user & TokenIssues>(mockContext(user))).toBe(
+      user,
+    );
+  });
+
+  it('should return a raw JWT string as-is', () => {
+    const token = 'eyJhbGciOiJIUzI1NiJ9.payload.signature';
+    expect(extractAuthUser<string>(mockContext(token))).toBe(token);
+  });
+
+  it('should return undefined when no user is present and not throw', () => {
+    expect(() =>
+      extractAuthUser<Record<string, unknown> & TokenIssues>(mockContext()),
+    ).not.toThrow();
+    expect(
+      extractAuthUser<Record<string, unknown> & TokenIssues>(mockContext()),
+    ).toBeUndefined();
+  });
+
+  it('should not mutate the request object', () => {
+    const user = { sub: '123', role: 'admin', iat: 1, exp: 2 };
+    const ctx = mockContext(user);
+    extractAuthUser<typeof user & TokenIssues>(ctx);
+    expect(ctx.switchToHttp().getRequest()).toEqual({ user });
+  });
+
+  it('should return undefined when the request itself is missing', () => {
+    const ctx = {
+      switchToHttp: () => ({
+        getRequest: () => undefined,
+      }),
+    } as unknown as ExecutionContext;
+    expect(
+      extractAuthUser<Record<string, unknown> & TokenIssues>(ctx),
+    ).toBeUndefined();
+  });
+});
+
+describe('AuthUser decorator', () => {
+  function mockContext(user?: unknown): ExecutionContext {
+    const request: { user?: unknown } = user === undefined ? {} : { user };
+    return {
+      switchToHttp: () => ({
+        getRequest: () => request,
+      }),
+    } as unknown as ExecutionContext;
+  }
+
+  it('should return a function (decorator factory)', () => {
+    expect(typeof AuthUser<Record<string, unknown> & TokenIssues>()).toBe(
+      'function',
+    );
+  });
+
+  it('should support the string generic', () => {
+    expect(typeof AuthUser<string>()).toBe('function');
+  });
+
+  it('should support the default generic', () => {
+    expect(typeof AuthUser()).toBe('function');
+  });
+
+  it('should produce independent decorators on each invocation', () => {
+    expect(AuthUser<Record<string, unknown>>()).not.toBe(
+      AuthUser<Record<string, unknown>>(),
+    );
+  });
+
+  it('should resolve the object payload through the factory', () => {
+    const user = { sub: '123', role: 'admin', iat: 1, exp: 2 };
+    expect(
+      authUserFactory<typeof user & TokenIssues>(undefined, mockContext(user)),
+    ).toBe(user);
+  });
+
+  it('should resolve a string payload through the factory', () => {
+    const token = 'eyJhbGciOiJIUzI1NiJ9.payload.signature';
+    expect(authUserFactory<string>(undefined, mockContext(token))).toBe(token);
+  });
+
+  it('should resolve undefined through the factory when no user is present', () => {
+    expect(
+      authUserFactory<Record<string, unknown> & TokenIssues>(
+        undefined,
+        mockContext(),
+      ),
+    ).toBeUndefined();
   });
 });

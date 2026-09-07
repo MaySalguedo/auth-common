@@ -13,6 +13,7 @@ export * from './common/tokens/require-attribute-key.token';
 export * from './common/decorators/public-guard.decorator';
 export * from './common/decorators/use-guard.decorator';
 export * from './common/decorators/require-attribute.decorator';
+export * from './common/decorators/auth-user.decorator';
 
 export * from './common/exceptions/failed-dependency.exception';
 
