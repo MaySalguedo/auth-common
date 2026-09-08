@@ -11,6 +11,11 @@ import {
   authUserFactory,
   extractAuthUser,
 } from './auth-user.decorator';
+import {
+  HasAttribute,
+  extractHasAttribute,
+  hasAttributeFactory,
+} from './has-attribute.decorator';
 
 function applyToClass(decorator: ClassDecorator): unknown {
   const target = class TestController {};
@@ -324,5 +329,133 @@ describe('AuthUser decorator', () => {
         mockContext(),
       ),
     ).toBeUndefined();
+  });
+});
+
+describe('extractHasAttribute', () => {
+  it('should return true for matching scalar top-level attribute (AC1)', () => {
+    expect(
+      extractHasAttribute({ role: 'admin', iat: 1, exp: 2 }, 'role', 'admin'),
+    ).toBe(true);
+  });
+
+  it('should return false for non-matching scalar and never throw (AC2)', () => {
+    expect(() =>
+      extractHasAttribute({ role: 'user' }, 'role', 'admin'),
+    ).not.toThrow();
+    expect(extractHasAttribute({ role: 'user' }, 'role', 'admin')).toBe(false);
+  });
+
+  it('should resolve nested dot-path and handle missing intermediates (AC3)', () => {
+    expect(
+      extractHasAttribute(
+        { organization: { plan: 'pro' } },
+        'organization.plan',
+        'pro',
+      ),
+    ).toBe(true);
+    expect(extractHasAttribute({}, 'organization.plan', 'pro')).toBe(false);
+    expect(
+      extractHasAttribute({ organization: null }, 'organization.plan', 'pro'),
+    ).toBe(false);
+  });
+
+  it('should use includes semantics for array payload + scalar expected (AC4)', () => {
+    expect(
+      extractHasAttribute({ roles: ['admin', 'editor'] }, 'roles', 'admin'),
+    ).toBe(true);
+    expect(extractHasAttribute({ roles: ['editor'] }, 'roles', 'admin')).toBe(
+      false,
+    );
+  });
+
+  it('should use EVERY semantics for array expected (AC5)', () => {
+    expect(
+      extractHasAttribute(
+        { permissions: ['read', 'write', 'delete'] },
+        'permissions',
+        ['read', 'write'],
+      ),
+    ).toBe(true);
+    expect(
+      extractHasAttribute({ permissions: ['read'] }, 'permissions', [
+        'read',
+        'write',
+      ]),
+    ).toBe(false);
+    expect(extractHasAttribute({ permissions: ['a'] }, 'permissions', [])).toBe(
+      false,
+    );
+  });
+
+  it('should flatten nested arrays (AC6)', () => {
+    const user = { orgs: [{ role: 'viewer' }, { role: 'admin' }] };
+    expect(extractHasAttribute(user, 'orgs.role', 'admin')).toBe(true);
+    expect(
+      extractHasAttribute({ orgs: [{ role: 'viewer' }] }, 'orgs.role', 'admin'),
+    ).toBe(false);
+  });
+
+  it('should return false for null/undefined payload without throwing', () => {
+    expect(extractHasAttribute(null, 'role', 'admin')).toBe(false);
+    expect(extractHasAttribute(undefined, 'role', 'admin')).toBe(false);
+  });
+});
+
+describe('hasAttributeFactory', () => {
+  function mockHasAttributeContext(user?: unknown): ExecutionContext {
+    const request: { user?: unknown } = user === undefined ? {} : { user };
+    return {
+      switchToHttp: () => ({
+        getRequest: () => request,
+      }),
+    } as unknown as ExecutionContext;
+  }
+
+  it('should return true when req.user matches', () => {
+    const ctx = mockHasAttributeContext({ role: 'admin' });
+    expect(hasAttributeFactory({ path: 'role', value: 'admin' }, ctx)).toBe(
+      true,
+    );
+  });
+
+  it('should return false when req.user does not match', () => {
+    const ctx = mockHasAttributeContext({ role: 'user' });
+    expect(hasAttributeFactory({ path: 'role', value: 'admin' }, ctx)).toBe(
+      false,
+    );
+  });
+
+  it('should return false on public routes with no user and not throw (AC7)', () => {
+    const ctx = mockHasAttributeContext();
+    expect(() =>
+      hasAttributeFactory({ path: 'roles', value: 'admin' }, ctx),
+    ).not.toThrow();
+    expect(hasAttributeFactory({ path: 'roles', value: 'admin' }, ctx)).toBe(
+      false,
+    );
+  });
+
+  it('should return false when the request itself is missing', () => {
+    const ctx = {
+      switchToHttp: () => ({
+        getRequest: () => undefined,
+      }),
+    } as unknown as ExecutionContext;
+    expect(hasAttributeFactory({ path: 'role', value: 'admin' }, ctx)).toBe(
+      false,
+    );
+  });
+});
+
+describe('HasAttribute decorator', () => {
+  it('should return a function (decorator factory)', () => {
+    expect(typeof HasAttribute('roles', 'admin')).toBe('function');
+  });
+
+  it('should produce independent decorators on each invocation', () => {
+    expect(HasAttribute('roles', 'admin')).not.toBe(
+      HasAttribute('roles', 'admin'),
+    );
   });
 });
