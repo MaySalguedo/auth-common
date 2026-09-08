@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-^5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Passport](https://img.shields.io/badge/Passport--JWT-4.0-34E27A?style=for-the-badge&logo=passport&logoColor=white)](http://www.passportjs.org)
 [![License: EPL-2.0](https://img.shields.io/badge/License-EPL--2.0-yellow?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue?style=for-the-badge)]()
+[![Version](https://img.shields.io/badge/version-1.2.0-blue?style=for-the-badge)]()
 
 Plug-and-play JWT authentication infrastructure for **NestJS microservices**. One module registration wires up guards, strategies, and a runtime guard orchestrator — so your services share a consistent auth layer without repeating boilerplate.
 
@@ -30,6 +30,7 @@ Plug-and-play JWT authentication infrastructure for **NestJS microservices**. On
   - [`@UseGuards()`](#useguards)
   - [`@RequireAttribute()`](#requireattribute)
   - [`@AuthUser()`](#authuser)
+  - [`@HasAttribute()`](#hasattribute)
 - [Custom Payload Validation](#custom-payload-validation)
 - [Custom Guards](#custom-guards)
 - [Interfaces & Types](#interfaces--types)
@@ -49,7 +50,7 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 - Registers a `JwtStrategy` backed by `passport-jwt`.
 - Provides a `JwtGuard` extending NestJS's `AuthGuard('jwt')`.
 - Wires an **`OrchestratorGuard`** — a smart global guard that reads route metadata and delegates to the correct named guard at runtime.
-- Exposes clean decorators (`@PublicGuard()`, `@UseGuards()`, `@RequireAttribute()`, `@AuthUser()`) for per-route control.
+- Exposes clean decorators (`@PublicGuard()`, `@UseGuards()`, `@RequireAttribute()`, `@AuthUser()`, `@HasAttribute()`) for per-route control.
 
 ---
 
@@ -62,6 +63,7 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 - 🧩 **Custom payload validation** — inject your own `validate()` function to enrich or reject the decoded token payload.
 - ✅ **Attribute validation** — declaratively require JWT payload attributes (nested + array-aware) via `@RequireAttribute()` enforced in `JwtGuard`.
 - 👤 **Typed user injection** — read `request.user` directly as a handler parameter with full generic type safety via `@AuthUser()`.
+- ✋ **Handler-level attribute checks** — branch on JWT payload attributes with the same nested + array semantics via `@HasAttribute()`.
 - 📦 **Minimal peer dependencies** — only requires the standard NestJS core packages.
 
 ---
@@ -366,6 +368,85 @@ export class UsersController {
 * Whole user only — no property-path picking (e.g. `@AuthUser('sub')`).
 * No validation or transformation — guards and the `validate` option stay authoritative.
 * Missing user resolves to `undefined` — the handler or guard decides what to do.
+
+---
+
+### `@HasAttribute()`
+
+Injects a `boolean` handler parameter answering whether the verified JWT payload (`request.user` from `JwtStrategy`) contains a given attribute value — same nested + array semantics as `@RequireAttribute()`, but for branching instead of `403` enforcement. No `@Req()` / `@Request()` import, no manual path resolution, never throws.
+
+```typescript
+import { Controller, Get } from '@nestjs/common';
+import { HasAttribute } from '@may-salguedo/auth-common';
+
+@Controller('dashboard')
+export class DashboardController {
+  // scalar top-level: payload { role: 'admin' }
+  @Get('admin')
+  getAdmin(@HasAttribute('role', 'admin') isAdmin: boolean) {
+    return isAdmin ? 'full' : 'limited';
+  }
+
+  // nested dot-path: payload { organization: { plan: 'pro' } }
+  @Get('billing')
+  getBilling(@HasAttribute('organization.plan', 'pro') isPro: boolean) {
+    return isPro;
+  }
+
+  // array payload + scalar expected: payload { roles: ['admin','editor'] }
+  @Get('editor')
+  getEditor(@HasAttribute('roles', 'admin') canEdit: boolean) {
+    return canEdit;
+  }
+
+  // array expected requires EVERY value: payload { permissions: ['read','write'] }
+  @Get('write')
+  getWrite(
+    @HasAttribute('permissions', ['read', 'write']) canWrite: boolean,
+  ) {
+    return canWrite;
+  }
+
+  // nested + array flattening: payload { orgs: [{role:'viewer'}, {role:'admin'}] }
+  @Get('org-admin')
+  getOrgAdmin(@HasAttribute('orgs.role', 'admin') isOrgAdmin: boolean) {
+    return isOrgAdmin;
+  }
+}
+```
+
+**Behavior:**
+
+| Payload shape | Decorator | Result |
+|---|---|---|
+| `{ roles: ['admin','editor'] }` | `@HasAttribute('roles','admin')` | ✅ `true` (`includes`) |
+| `{ roles: ['editor'] }` | `@HasAttribute('roles','admin')` | ❌ `false` |
+| `{ permissions: ['read','write','delete'] }` | `@HasAttribute('permissions',['read','write'])` | ✅ `true` (`EVERY`) |
+| `{ permissions: ['read'] }` | `@HasAttribute('permissions',['read','write'])` | ❌ `false` (not all present) |
+| `{ orgs: [{role:'admin'}] }` | `@HasAttribute('orgs.role','admin')` | ✅ `true` (flattened `orgs[*].role`) |
+| `{}` or `{ organization: null }` | `@HasAttribute('organization.plan','pro')` | ❌ `false` — no crash |
+| missing (e.g. `@PublicGuard()` route) | `@HasAttribute('roles','admin')` | ❌ `false` — no throw |
+
+**Composition:**
+
+* Works after `JwtGuard`, any custom registry guard, and on public routes.
+* Multiple parameters compose via handler logic — no metadata stacking:
+  ```typescript
+  @Get('dashboard')
+  getDashboard(
+    @HasAttribute('roles', 'admin') isAdmin: boolean,
+    @HasAttribute('tenant', 'acme') isAcme: boolean,
+  ) {
+    return isAdmin && isAcme;
+  }
+  ```
+* For enforcement use `@RequireAttribute()`; for the whole user use `@AuthUser()`.
+
+**Scope limits (v1):**
+* Boolean only — no raw value extraction.
+* No enforcement / throwing — `@RequireAttribute()` + `JwtGuard` stay authoritative for `403`.
+* Strict equality (`===`) + array semantics only — no regex/comparator injection.
+* No OR combinators — combine booleans in the handler.
 
 ---
 

@@ -1,94 +1,105 @@
-# Release Notes — v1.1.0
+# Release Notes — v1.2.0
 
-> **Target:** `develop` → `main` | **Date:** 2026-09-07 | **Scope:** `@may-salguedo/auth-common` (npmjs) / `@MaySalguedo/auth-common` (GH Packages) | **Compare:** `main...develop`
+> **Target:** `develop` → `main` | **Date:** 2026-09-08 | **Scope:** `@may-salguedo/auth-common` (npmjs) / `@MaySalguedo/auth-common` (GH Packages) | **Compare:** `main...develop`
 
-This release adds the generic `@AuthUser()` parameter decorator for typed `req.user` access, plus the contributor guide and matching README coverage. Fully additive — no breaking changes.
+This release adds the `@HasAttribute()` parameter decorator for handler-level boolean checks on JWT payload attributes, plus matching README coverage. Fully additive — no breaking changes.
 
 ---
 
 ## Highlights
 
-- **New Feature:** `@AuthUser()` — generic handler-param injection of `req.user`, covering object payloads (`T & TokenIssues`) and raw JWT strings, with no `@Req()` import — `feat(decorator): AuthUser` (#7, related to #6)
-- **DX:** New `CONTRIBUTING.md` (setup, branches, commits, `act`-based checks, PRs + forks, releases) and `README.md` `@AuthUser()` showcase with behavior table
-- **Chore:** Gitignored local drafts renamed to `ISSUE.md` / `PULL_REQUEST.md` (`.gitignore:63-64`), version bumped to `1.1.0`
+- **New Feature:** `@HasAttribute()` — handler-param boolean injection answering "does `req.user` contain this attribute value?", covering nested dot-paths and array-aware semantics, with no `@Req()` import and no throw on public routes — `feat(decorator): HasAttribute` (#10, resolves #9, links #1 and #6)
+- **DX:** `README.md` `@HasAttribute()` showcase with examples, behavior table, composition notes, and v1 scope limits
+- **Chore:** Version bumped to `1.2.0`
 
 ---
 
 ## Detailed Changes
 
-### 1. Features — `feat(decorator): add AuthUser param decorator` (#7) — `Related to #6`
+### 1. Features — `feat(decorator): add HasAttribute param decorator` (#10) — `Resolves #9, links #1 and #6`
 
-**Motivation:** Every protected handler imported `@Req()` / `@Request()` from `@nestjs/common` just to reach `req.user`, then manually cast it to the caller's payload type. Repetitive, untyped by default, and easy to drift between `object + TokenIssues` vs `string` JWT usages. No helper existed in `src/index.ts` or `src/common/decorators/`.
+**Motivation:** `@RequireAttribute()` (#1) enforces attributes at route level with `403`, and `@AuthUser()` (#6) injects the whole user — but handlers had no way to *branch* on a single JWT attribute without re-implementing dot-path + array resolution manually or misusing route-level enforcement that cannot express `if/else`.
 
 **Implementation:**
-- `src/common/decorators/auth-user.decorator.ts:3` — `extractAuthUser<T>(ctx)`, reads `req.user` via `switchToHttp().getRequest()`, returns `undefined` when absent, never throws
-- `src/common/decorators/auth-user.decorator.ts:8` — `authUserFactory<T>(_data, ctx)` named `createParamDecorator` factory, directly unit-testable
-- `src/common/decorators/auth-user.decorator.ts:15` — `AuthUser<T = unknown>()`, generic decorator factory: `@AuthUser<MyPayload>()` / `@AuthUser<string>()`
-- `src/common/decorators/decorators.spec.ts` — consolidated `extractAuthUser` + `AuthUser` suites (object + `TokenIssues`, string JWT, missing user, missing request, factory independence)
-- `src/index.ts:16` — barrel export for the new decorator
+- `src/common/decorators/has-attribute.decorator.ts:6` — `extractHasAttribute(payload, path, value)`, pure check composing `getFlattenedByPath` + `matchesAttribute` (`RequireAttribute` semantics: dot-path, transparent array flattening, scalar `includes` (`===`), array-expected `EVERY`, empty-expected `false`); returns `false` on `null`/`undefined` payload, never throws
+- `src/common/decorators/has-attribute.decorator.ts:15` — `hasAttributeFactory(data, ctx)`, reads `req.user` via reused `extractAuthUser` (`AuthUser` plumbing, `RequireAttributeRule` shape); missing user/request → `false`
+- `src/common/decorators/has-attribute.decorator.ts:23` — `HasAttribute(path, value)`, `createParamDecorator` factory: `@HasAttribute('roles','admin') hasAdmin: boolean`
+- `src/common/decorators/decorators.spec.ts` — consolidated `extractHasAttribute` (AC1–AC6) + `hasAttributeFactory` (match/mismatch/AC7/missing request) + `HasAttribute` factory suites
+- `src/index.ts:17` — barrel export for the new decorator
 
 **Usage:**
 ```typescript
-import { AuthUser, TokenIssues } from '@may-salguedo/auth-common';
+import { HasAttribute } from '@may-salguedo/auth-common';
 
-interface MyPayload { sub: string; role: string; }
+// scalar: payload { role: 'admin' }
+@Get('admin') getAdmin(@HasAttribute('role', 'admin') isAdmin: boolean) {}
 
-// object payload: { sub: '123', role: 'admin', iat: 1, exp: 2 }
-@Get('me') getMe(@AuthUser<MyPayload>() user: MyPayload & TokenIssues) {}
+// nested: payload { organization: { plan: 'pro' } }
+@Get('billing') getBilling(@HasAttribute('organization.plan', 'pro') isPro: boolean) {}
 
-// raw JWT string
-@Get('token') getToken(@AuthUser<string>() token: string) {}
+// arrays: payload { roles: ['admin','editor'] } / { permissions: ['read','write'] }
+@Get('write') getWrite(@HasAttribute('permissions', ['read', 'write']) canWrite: boolean) {}
 
-// public route without user → undefined, no throw
+// flattened: payload { orgs: [{role:'viewer'}, {role:'admin'}] }
+@Get('org-admin') getOrgAdmin(@HasAttribute('orgs.role', 'admin') isOrgAdmin: boolean) {}
+
+// public route without user → false, no throw
 @PublicGuard()
-@Get('open') getOpen(@AuthUser<MyPayload>() user: MyPayload & TokenIssues | undefined) {}
+@Get('open') getOpen(@HasAttribute('roles', 'admin') hasAdmin: boolean) {}
 ```
 
-**Verified:** `pnpm test`/`pnpm test:cov` 144/144 across 8 suites (`auth-user.decorator.ts` 100% stmts/branches/funcs/lines, global ≥90% per `package.json`), `pnpm lint:no-spec`/`pnpm check`/`pnpm build` green, root export resolves from `dist/index.js`.
+**Verified:** `pnpm test`/`pnpm test:cov` 157/157 across 8 suites (`has-attribute.decorator.ts` 100% stmts/branches/funcs/lines, global ≥90% per `package.json`), `pnpm lint:no-spec`/`pnpm lint`/`pnpm check`/`pnpm build` green, root export resolves from `dist/index.js`.
 
-**Merged:** `08a273d` → `Merge #7` `ac7693b` — `Related to #6`
+### 2. Docs — `README.md` HasAttribute showcase
 
-### 2. Docs — `docs(contributing): guide + showcase`
-
-**Motivation:** `README.md` had no `@AuthUser()` documentation, no contributor workflow existed, and the `Table of Contents` linked to a missing `## Contributing` section.
+**Motivation:** New public API needs discoverable documentation consistent with the existing `@RequireAttribute()` / `@AuthUser()` sections.
 
 **Implementation:**
-- `CONTRIBUTING.md:1` (new) — prerequisites (Node 24, pnpm 11.25), layout + path aliases, `feat/*` branching off `develop`, conventional commits, `act`-based CI checks, fork-PR flow, maintainer-only releases
-- `README.md` — new `### @AuthUser()` section with object + string examples, behavior table, and v1 scope limits; ToC, Features, and Overview entries; missing `## Contributing` section added
-- `.gitignore:63-64` — local drafts renamed `issue.md`/`pull_request.md` → `ISSUE.md`/`PULL_REQUEST.md` with all references updated (`CONTRIBUTING.md`, release notes)
-- `package.json:3` + `README.md:9` — version bumped to `1.1.0`, badge refreshed
+- ToC, Overview decorator list, and Features entries for `@HasAttribute()`
+- New `### @HasAttribute()` section with five usage examples, behavior table (`true`/`false` matrix), composition notes (multiple params via handler logic; enforcement stays with `@RequireAttribute()`, whole user with `@AuthUser()`), and v1 scope limits
 
-**Verified:** `pnpm check` green (docs-only, no `src/` change), zero stale lowercase draft references (grep clean), renamed drafts still gitignored (`git check-ignore` verified).
+**Verified:** `pnpm check` green (docs-only delta), ToC anchors verified.
 
-**Merged:** `6bd11f2` + version bump — on `develop`, release PR pending.
+---
+
+## Issues
+
+- #9 — `[PITCH] - HasAttribute param decorator for handler-level boolean checks` — **CLOSED** (resolved by this release)
+- #1 — `[PITCH] - RequireAttribute decorator for JWT payload validation (nested + arrays) via JwtGuard` — **CLOSED** (linked: attribute semantics reused)
+- #6 — `[PITCH] - AuthUser decorator for typed req.user access` — **CLOSED** (linked: request plumbing reused)
+
+## Commits
+
+- `30cdcd9` — `feat(decorator): add HasAttribute param decorator for handler-level boolean checks` (+159: new decorator, barrel export, consolidated specs)
+- `docs(readme): HasAttribute showcase` — `README.md` (+82/-1: ToC, Overview, Features, new `### @HasAttribute()` section)
+- `chore(release): bump to v1.2.0` — `package.json:3`, `README.md:9` badge, this file
+
+## Pull Requests
+
+- #10 — `feat(decorator): add HasAttribute param decorator for handler-level boolean checks` (`feat/has-attribute` → `develop`) — **MERGED**
+- *(this release)* `develop` → `main` — **PENDING** (merge, then tag `v1.2.0`)
+
+Full diff: `main...develop` — 4 files, +241/-1 approx (feature + docs + version).
 
 ---
 
 ## Breaking Changes
 
-- **API:** None — purely additive export. Existing `@Req()` + cast code keeps working unchanged.
-- **Release process:** `RELEASE_NOTES.md` must be committed before `git tag v*` — `cd.yml:134` will fail if missing (intentional, curated notes).
+- **API:** None — purely additive export. Existing `@RequireAttribute()` enforcement and `@AuthUser()` injection keep working unchanged.
+- **Release process:** `RELEASE_NOTES.md` must be committed before `git tag v*` — `cd.yml` will fail if missing (intentional, curated notes).
 
 ## Migration Guide
 
 ```bash
 # No package migration — scope stays @may-salguedo/auth-common
 
-# Optional: Adopt AuthUser (replace manual req.user casts)
-import { AuthUser, TokenIssues } from '@may-salguedo/auth-common';
-@Get('me') getMe(@AuthUser<MyPayload>() user: MyPayload & TokenIssues) {}
+# Optional: Adopt HasAttribute for handler branching (replaces manual user inspection)
+import { HasAttribute } from '@may-salguedo/auth-common';
+@Get('admin') getAdmin(@HasAttribute('roles', 'admin') isAdmin: boolean) {}
 
 # Release: write RELEASE_NOTES.md, then tag
-git tag v1.1.0 && git push origin v1.1.0 # triggers CD: wait-for-ci → setup → trivy-scan → publish-npmjs + publish-github → release --notes-file
+git tag v1.2.0 && git push origin v1.2.0 # triggers CD: wait-for-ci → setup → trivy-scan → publish-npmjs + publish-github → release --notes-file
 ```
-
-## What's Changed — Commits & PRs
-
-- `feat(decorator): AuthUser` (#7) — `08a273d`, merge `ac7693b` — `Related to #6`
-- `docs(contributing): guide + showcase + renames` — `6bd11f2`
-- `chore(release): bump to v1.1.0` — `package.json:3`, `README.md:9` badge, this file
-
-Full diff: `main...develop` — 10 files, +430/-10 approx (feature + docs + version).
 
 ## Contributors
 
@@ -100,5 +111,5 @@ Full diff: `main...develop` — 10 files, +430/-10 approx (feature + docs + vers
 ## Checklist for Release
 
 - [x] `RELEASE_NOTES.md` committed (this file)
-- [ ] `git tag v1.1.0 && git push origin v1.1.0` triggers `cd.yml`
-- [ ] Verify `npm view @may-salguedo/auth-common version` and `GH Packages @MaySalguedo/auth-common` + `gh release view v1.1.0 --json body` matches this file
+- [ ] `git tag v1.2.0 && git push origin v1.2.0` triggers `cd.yml`
+- [ ] Verify `npm view @may-salguedo/auth-common version` and `GH Packages @MaySalguedo/auth-common` + `gh release view v1.2.0 --json body` matches this file
