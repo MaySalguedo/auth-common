@@ -15,6 +15,8 @@ export * from './common/decorators/use-guard.decorator';
 export * from './common/decorators/require-attribute.decorator';
 export * from './common/decorators/auth-user.decorator';
 export * from './common/decorators/has-attribute.decorator';
+export * from './common/decorators/headers.decorator';
+export * from './common/decorators/session.decorator';
 
 export * from './common/exceptions/failed-dependency.exception';
 
