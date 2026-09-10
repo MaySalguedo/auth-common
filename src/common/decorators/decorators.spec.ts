@@ -1,4 +1,4 @@
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, PipeTransform } from '@nestjs/common';
 import { IS_PUBLIC_KEY } from '@tokens/is-public-key.token';
 import { USE_GUARDS_KEY } from '@tokens/use-guards-key.token';
 import { REQUIRE_ATTRIBUTE_KEY } from '@tokens/require-attribute-key.token';
@@ -16,6 +16,8 @@ import {
   extractHasAttribute,
   hasAttributeFactory,
 } from './has-attribute.decorator';
+import { Headers, extractHeaders, headersFactory } from './headers.decorator';
+import { Session, extractSession, sessionFactory } from './session.decorator';
 
 function applyToClass(decorator: ClassDecorator): unknown {
   const target = class TestController {};
@@ -457,5 +459,226 @@ describe('HasAttribute decorator', () => {
     expect(HasAttribute('roles', 'admin')).not.toBe(
       HasAttribute('roles', 'admin'),
     );
+  });
+});
+
+describe('Headers decorator', () => {
+  function mockContext(headers?: Record<string, string>): ExecutionContext {
+    const request: { headers?: Record<string, string> } =
+      headers === undefined ? {} : { headers };
+    return {
+      switchToHttp: () => ({
+        getRequest: () => request,
+      }),
+    } as unknown as ExecutionContext;
+  }
+
+  it('should return a function (decorator factory)', () => {
+    expect(typeof Headers()).toBe('function');
+    expect(typeof Headers('x-request-id')).toBe('function');
+  });
+
+  it('should produce independent decorators on each invocation', () => {
+    expect(Headers()).not.toBe(Headers());
+    expect(Headers('x-request-id')).not.toBe(Headers('x-request-id'));
+  });
+
+  describe('extractHeaders', () => {
+    it('should return headers object when present', () => {
+      const headers = { 'x-request-id': 'abc123', 'x-tenant-id': 'tenant1' };
+      const ctx = mockContext(headers);
+      expect(extractHeaders(ctx)).toEqual(headers);
+    });
+
+    it('should return undefined when request is missing', () => {
+      const ctx = {
+        switchToHttp: () => ({
+          getRequest: () => undefined,
+        }),
+      } as unknown as ExecutionContext;
+      expect(extractHeaders(ctx)).toBeUndefined();
+    });
+
+    it('should return undefined when headers property is missing', () => {
+      const ctx = mockContext();
+      expect(extractHeaders(ctx)).toBeUndefined();
+    });
+  });
+
+  describe('headersFactory', () => {
+    it('should extract specific header value when present (AC1)', () => {
+      const ctx = mockContext({ 'x-request-id': 'abc123' });
+      expect(headersFactory('x-request-id', ctx)).toBe('abc123');
+    });
+
+    it('should return undefined when header is missing (AC2)', () => {
+      const ctx = mockContext({ 'other-header': 'value' });
+      expect(headersFactory('x-request-id', ctx)).toBeUndefined();
+    });
+
+    it('should return all headers when no data provided', () => {
+      const headers = { 'x-request-id': 'abc123', 'x-tenant-id': 'tenant1' };
+      const ctx = mockContext(headers);
+      expect(headersFactory(undefined, ctx)).toEqual(headers);
+    });
+
+    it('should return empty object when no headers present', () => {
+      const ctx = mockContext({});
+      expect(headersFactory(undefined, ctx)).toEqual({});
+    });
+
+    it('should return undefined when request is missing', () => {
+      const ctx = {
+        switchToHttp: () => ({
+          getRequest: () => undefined,
+        }),
+      } as unknown as ExecutionContext;
+      expect(headersFactory('x-request-id', ctx)).toBeUndefined();
+    });
+
+    it('should match headers case-insensitively (Express behavior)', () => {
+      const ctx = mockContext({ 'X-Request-ID': 'abc123' });
+      expect(headersFactory('x-request-id', ctx)).toBe('abc123');
+    });
+
+    it('should handle headers with hyphens', () => {
+      const ctx = mockContext({ 'x-tenant-id': 'tenant123' });
+      expect(headersFactory('x-tenant-id', ctx)).toBe('tenant123');
+    });
+
+    it('should handle headers with underscores', () => {
+      const ctx = mockContext({ x_custom_header: 'value' });
+      expect(headersFactory('x_custom_header', ctx)).toBe('value');
+    });
+  });
+
+  describe('pipe integration', () => {
+    it('should accept pipes as additional arguments', () => {
+      const factory = Headers('x-tenant-id', 'ParseUUIDPipe');
+      expect(typeof factory).toBe('function');
+    });
+
+    it('should accept multiple pipes', () => {
+      const factory = Headers('x-debug', 'ParseBoolPipe', 'ParseIntPipe');
+      expect(typeof factory).toBe('function');
+    });
+
+    it('should work with pipe instances', () => {
+      class TestPipe implements PipeTransform<string, string> {
+        transform(value: string) {
+          return value.toUpperCase();
+        }
+      }
+      const factory = Headers('x-custom', new TestPipe());
+      expect(typeof factory).toBe('function');
+    });
+  });
+});
+
+describe('Session decorator', () => {
+  function mockContext(session?: Record<string, unknown>): ExecutionContext {
+    const request: { session?: Record<string, unknown> } =
+      session === undefined ? {} : { session };
+    return {
+      switchToHttp: () => ({
+        getRequest: () => request,
+      }),
+    } as unknown as ExecutionContext;
+  }
+
+  it('should return a function (decorator factory)', () => {
+    expect(typeof Session()).toBe('function');
+    expect(typeof Session('userId')).toBe('function');
+  });
+
+  it('should produce independent decorators on each invocation', () => {
+    expect(Session()).not.toBe(Session());
+    expect(Session('userId')).not.toBe(Session('userId'));
+  });
+
+  describe('extractSession', () => {
+    it('should return session object when present', () => {
+      const session = { userId: '123', role: 'admin' };
+      const ctx = mockContext(session);
+      expect(extractSession(ctx)).toEqual(session);
+    });
+
+    it('should return undefined when request is missing', () => {
+      const ctx = {
+        switchToHttp: () => ({
+          getRequest: () => undefined,
+        }),
+      } as unknown as ExecutionContext;
+      expect(extractSession(ctx)).toBeUndefined();
+    });
+
+    it('should return undefined when session property is missing', () => {
+      const ctx = mockContext();
+      expect(extractSession(ctx)).toBeUndefined();
+    });
+  });
+
+  describe('sessionFactory', () => {
+    it('should extract specific session value when present (AC3)', () => {
+      const ctx = mockContext({ userId: '123', role: 'admin' });
+      expect(sessionFactory('userId', ctx)).toBe('123');
+    });
+
+    it('should return undefined when session key is missing', () => {
+      const ctx = mockContext({ role: 'admin' });
+      expect(sessionFactory('userId', ctx)).toBeUndefined();
+    });
+
+    it('should return whole session when no data provided (AC4)', () => {
+      const session = { userId: '123', role: 'admin' };
+      const ctx = mockContext(session);
+      expect(sessionFactory(undefined, ctx)).toEqual(session);
+    });
+
+    it('should return undefined when session is missing (AC5)', () => {
+      const ctx = mockContext();
+      expect(sessionFactory('userId', ctx)).toBeUndefined();
+    });
+
+    it('should return undefined when request is missing', () => {
+      const ctx = {
+        switchToHttp: () => ({
+          getRequest: () => undefined,
+        }),
+      } as unknown as ExecutionContext;
+      expect(sessionFactory('userId', ctx)).toBeUndefined();
+    });
+
+    it('should handle nested object values', () => {
+      const ctx = mockContext({ user: { id: '123', name: 'John' } });
+      expect(sessionFactory('user', ctx)).toEqual({ id: '123', name: 'John' });
+    });
+
+    it('should handle array values', () => {
+      const ctx = mockContext({ permissions: ['read', 'write'] });
+      expect(sessionFactory('permissions', ctx)).toEqual(['read', 'write']);
+    });
+  });
+
+  describe('pipe integration', () => {
+    it('should accept pipes as additional arguments', () => {
+      const factory = Session('userId', 'ParseIntPipe');
+      expect(typeof factory).toBe('function');
+    });
+
+    it('should accept multiple pipes', () => {
+      const factory = Session('userId', 'ParseIntPipe', 'CustomPipe');
+      expect(typeof factory).toBe('function');
+    });
+
+    it('should work with pipe instances', () => {
+      class TestPipe implements PipeTransform<string, string> {
+        transform(value: string) {
+          return value.toUpperCase();
+        }
+      }
+      const factory = Session('role', new TestPipe());
+      expect(typeof factory).toBe('function');
+    });
   });
 });
