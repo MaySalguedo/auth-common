@@ -31,6 +31,8 @@ Plug-and-play JWT authentication infrastructure for **NestJS microservices**. On
   - [`@RequireAttribute()`](#requireattribute)
   - [`@AuthUser()`](#authuser)
   - [`@HasAttribute()`](#hasattribute)
+  - [`@Headers()`](#headers)
+  - [`@Session()`](#session)
 - [Custom Payload Validation](#custom-payload-validation)
 - [Custom Guards](#custom-guards)
 - [Interfaces & Types](#interfaces--types)
@@ -50,7 +52,7 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 - Registers a `JwtStrategy` backed by `passport-jwt`.
 - Provides a `JwtGuard` extending NestJS's `AuthGuard('jwt')`.
 - Wires an **`OrchestratorGuard`** — a smart global guard that reads route metadata and delegates to the correct named guard at runtime.
-- Exposes clean decorators (`@PublicGuard()`, `@UseGuards()`, `@RequireAttribute()`, `@AuthUser()`, `@HasAttribute()`) for per-route control.
+- Exposes clean decorators (`@PublicGuard()`, `@UseGuards()`, `@RequireAttribute()`, `@AuthUser()`, `@HasAttribute()`, `@Headers()`, `@Session()`) for per-route control.
 
 ---
 
@@ -64,6 +66,8 @@ This library provides a single `AuthCommonModule.forRoot()` call that:
 - ✅ **Attribute validation** — declaratively require JWT payload attributes (nested + array-aware) via `@RequireAttribute()` enforced in `JwtGuard`.
 - 👤 **Typed user injection** — read `request.user` directly as a handler parameter with full generic type safety via `@AuthUser()`.
 - ✋ **Handler-level attribute checks** — branch on JWT payload attributes with the same nested + array semantics via `@HasAttribute()`.
+- 📋 **Header extraction** — access HTTP headers with case-insensitive matching and pipe support via `@Headers()`.
+- 🗄️ **Session access** — read session properties or the full session object with pipe support via `@Session()`.
 - 📦 **Minimal peer dependencies** — only requires the standard NestJS core packages.
 
 ---
@@ -447,6 +451,143 @@ export class DashboardController {
 * No enforcement / throwing — `@RequireAttribute()` + `JwtGuard` stay authoritative for `403`.
 * Strict equality (`===`) + array semantics only — no regex/comparator injection.
 * No OR combinators — combine booleans in the handler.
+
+---
+
+### `@Headers()`
+
+Extracts HTTP request headers with **case-insensitive matching** (matching Express behavior) and full **NestJS pipe support** for type transformation. Returns a specific header value, all headers as an object, or `undefined` when the header/request is missing.
+
+```typescript
+import { Controller, Get } from '@nestjs/common';
+import { Headers } from '@may-salguedo/auth-common';
+import { ParseUUIDPipe, ParseIntPipe } from '@nestjs/common';
+
+@Controller('requests')
+export class RequestsController {
+  // Single header: GET /requests/x-request-id
+  @Get('x-request-id')
+  getRequestId(@Headers('x-request-id') requestId: string) {
+    return requestId;
+  }
+
+  // All headers as object: GET /requests/headers
+  @Get('headers')
+  getAllHeaders(@Headers() headers: Record<string, string>) {
+    return headers;
+  }
+
+  // With pipe for type transformation: GET /requests/x-tenant-id
+  @Get('x-tenant-id')
+  getTenantId(@Headers('x-tenant-id', ParseUUIDPipe) tenantId: string) {
+    return tenantId;
+  }
+
+  // Custom header with numeric pipe: GET /requests/x-rate-limit
+  @Get('x-rate-limit')
+  getRateLimit(@Headers('x-rate-limit', ParseIntPipe) limit: number) {
+    return limit;
+  }
+}
+```
+
+**Behavior:**
+
+| Request headers | Decorator | Result |
+|---|---|---|
+| `x-request-id: abc123` | `@Headers('x-request-id')` | `'abc123'` |
+| `X-Request-ID: abc123` | `@Headers('x-request-id')` | `'abc123'` (case-insensitive) |
+| `x-request-id: abc123` | `@Headers('X-REQUEST-ID')` | `'abc123'` (case-insensitive) |
+| Missing header | `@Headers('x-request-id')` | `undefined` |
+| `{ 'x-a': '1', 'x-b': '2' }` | `@Headers()` | `{ 'x-a': '1', 'x-b': '2' }` |
+| Missing request | `@Headers('x-request-id')` | `undefined` |
+
+**Composition:**
+
+* Works on any route — public, JWT-protected, or custom guard-protected.
+* Combine with pipes for automatic type coercion and validation:
+  ```typescript
+  @Get('webhook')
+  handleWebhook(
+    @Headers('x-signature') signature: string,
+    @Headers('x-timestamp', ParseIntPipe) timestamp: number,
+  ) {}
+  ```
+* Returns normalized headers (lowercase keys) when called without argument.
+
+**Scope limits (v1):**
+* Header values only — no multi-value header support (returns first value).
+* No header prefix filtering — exact or case-insensitive key match only.
+* Relies on Express `req.headers` — behavior matches underlying platform.
+
+---
+
+### `@Session()`
+
+Extracts the **session object** from the request (requires session middleware like `express-session`) with full **NestJS pipe support**. Returns a specific session property, the entire session object, or `undefined` when session/request is missing.
+
+```typescript
+import { Controller, Get } from '@nestjs/common';
+import { Session } from '@may-salguedo/auth-common';
+import { ParseIntPipe } from '@nestjs/common';
+
+@Controller('session')
+export class SessionController {
+  // Single session property: GET /session/user-id
+  @Get('user-id')
+  getUserId(@Session('userId') userId: string) {
+    return userId;
+  }
+
+  // All session data: GET /session/all
+  @Get('all')
+  getAllSession(@Session() session: Record<string, unknown>) {
+    return session;
+  }
+
+  // With pipe for type transformation: GET /session/visit-count
+  @Get('visit-count')
+  getVisitCount(@Session('visitCount', ParseIntPipe) count: number) {
+    return count;
+  }
+
+  // Nested object property (returns nested object): GET /session/user
+  @Get('user')
+  getUser(@Session('user') user: { id: string; name: string }) {
+    return user;
+  }
+}
+```
+
+**Behavior:**
+
+| Session data | Decorator | Result |
+|---|---|---|
+| `{ userId: '123', visitCount: 5 }` | `@Session('userId')` | `'123'` |
+| `{ userId: '123', visitCount: 5 }` | `@Session('visitCount', ParseIntPipe)` | `5` (number) |
+| `{ user: { id: '123', name: 'John' } }` | `@Session('user')` | `{ id: '123', name: 'John' }` |
+| `{ userId: '123' }` | `@Session('missing')` | `undefined` |
+| `{}` | `@Session()` | `{}` |
+| Missing session | `@Session('userId')` | `undefined` |
+| Missing request | `@Session('userId')` | `undefined` |
+
+**Composition:**
+
+* Works on any route — public, JWT-protected, or custom guard-protected.
+* Combine with pipes for automatic type coercion:
+  ```typescript
+  @Get('profile')
+  getProfile(
+    @Session('userId', ParseUUIDPipe) userId: string,
+    @Session('preferences') prefs: Record<string, unknown>,
+  ) {}
+  ```
+* Returns `undefined` gracefully on public routes (no session) — no throw.
+
+**Scope limits (v1):**
+* Requires session middleware (e.g. `express-session`) — no session = `undefined`.
+* No deep path picking — `@Session('user.id')` returns `undefined` (use `@Session('user')` then destructure).
+* Relies on Express `req.session` — behavior matches underlying platform.
 
 ---
 
